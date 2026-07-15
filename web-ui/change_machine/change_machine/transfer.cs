@@ -1,0 +1,296 @@
+﻿using DataCommonOperate;
+using MacCommunicate;
+using System.Web.Script.Serialization;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
+using System.Xml.Linq;
+
+namespace change_machine
+{
+    public class transfer
+    {
+        // 共享服务器配置
+        static string ShareServerPath = @"\\192.168.1.100\share";  // 共享服务器路径
+        static string LocalTempPath = @"D:\nc_files";               // 本地临时目录
+        static string MachineNcPath = @"C:\NCFiles";                // 机床NC文件目录
+
+        // 配置：始终与 MachineMonitor.exe 执行路径一致
+        // 从当前运行目录向上逐级查找 config.json，避免受 subs/ 嵌套层级影响
+        static string ConfigPath = ResolveConfigPath();
+
+        static string ResolveConfigPath()
+        {
+            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+            while (dir != null)
+            {
+                string candidate = Path.Combine(dir.FullName, "config.json");
+                if (File.Exists(candidate))
+                    return candidate;
+                dir = dir.Parent;
+            }
+            // 兜底：回到 MachineMonitor.exe 同级目录（默认退一级）
+            return Path.Combine(Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).FullName, "config.json");
+        }
+
+        static readonly string ApiBase = "http://localhost:8888";
+        static readonly JavaScriptSerializer Js = new JavaScriptSerializer();
+        static readonly string StepName = "transfer";
+        static readonly string DisplayName = "传输程序";
+
+        // 数据库
+        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharSet=utf8;";
+        static CommonInterface Mysql = CommonFactory.CreateInstance(CommonData.mysql, "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharSet=utf8;");
+
+        /// <summary>
+        /// 执行传输程序流程
+        /// </summary>
+        public bool RunTransferProcess(string ip, string workpiecename)
+        {
+            bool flag = false;
+            Log("INFO", "开始执行传输程序流程...");
+            Log("INFO", $"获取到待上传工件: {workpiecename}");
+
+            // 从共享服务器搜索名称为"工件名称后缀.nc"的文件
+            string ncFileName = workpiecename + ".nc";
+            string shareFilePath = Path.Combine(ShareServerPath, ncFileName);
+            string localFilePath = Path.Combine(LocalTempPath, ncFileName);
+            string machineFilePath = Path.Combine(MachineNcPath, ncFileName);
+
+            Log("INFO", $"共享服务器文件路径: {shareFilePath}");
+
+            // 检查共享服务器文件是否存在
+            if (!File.Exists(shareFilePath))
+            {
+                Log("ERROR", $"共享服务器文件不存在: {shareFilePath}");
+                return false;
+            }
+
+            // 用文件流复制到本地指定路径
+            try
+            {
+                File.Copy(shareFilePath, localFilePath, true);
+                Log("INFO", $"文件已复制到本地: {localFilePath}");
+            }
+            catch (Exception ex)
+            {
+                Log("ERROR", $"复制文件到本地失败: {ex.Message}");
+            }
+
+            // 复制成功后用文件流复制到机床指定路径
+            try
+            {
+                // 通过SMB协议复制到机床
+                string machineSharePath = $@"\\{ip}\{MachineNcPath.Replace(":", "")}";
+
+                // 确保机床目标目录存在（如果可以访问）
+                try
+                {
+                    if (!Directory.Exists(machineSharePath))
+                    {
+                        // 尝试创建目录
+                        try
+                        {
+                            Directory.CreateDirectory(machineSharePath);
+                        }
+                        catch
+                        {
+                            // 目录可能无法创建，继续尝试复制文件
+                        }
+                    }
+                }
+                catch
+                {
+                    // 忽略目录检查错误
+                }
+
+                // 复制文件到机床
+                string machineFileFullPath = $@"\\{ip}\{MachineNcPath.Replace(":", "")}\{ncFileName}";
+                File.Copy(localFilePath, machineFileFullPath, true);
+                if (File.Exists(machineFileFullPath))
+                {
+                    flag = true;
+                    Log("INFO", $"文件已复制到机床: {machineFileFullPath}");
+                }
+                else
+                {
+                    flag = false;
+                    Log("ERROR", $"复制文件到机床失败");
+                }
+            }
+            catch (Exception ex)
+            {
+                flag = false;
+                Log("ERROR", $"复制文件到机床失败: {ex.Message}");
+                // 即使复制到机床失败，本地文件已存在，可以手动上传
+            }
+
+            Log("INFO", "传输程序流程结束");
+            return flag;
+        }
+
+        /// <summary>
+        /// 更新rack_administrate表的workstate状态
+        /// </summary>
+        /// <param name="workpieceName">工件名称</param>
+        /// <param name="workstate">工作状态 (0: 待加工, 1: 上传程序成功)</param>
+        /// <returns>是否更新成功</returns>
+        static bool UpdateRackAdministrateWorkstate(string workpieceName, int workstate)
+        {
+            try
+            {
+                string sql = $"UPDATE rack_administrate SET workstate = {workstate} WHERE workpiecename = '{workpieceName}'";
+                bool result = Mysql.ExecuteSql(sql);
+
+                if (result)
+                {
+                    Log("INFO", $"更新工件 {workpieceName} 的workstate为 {workstate} 成功");
+                }
+                else
+                {
+                    Log("ERROR", $"更新工件 {workpieceName} 的workstate失败");
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Log("ERROR", $"更新工件状态异常: {ex.Message}");
+                return false;
+            }
+        }
+
+        public static void LoadConfig()
+        {
+            try
+            {
+                if (File.Exists(ConfigPath))
+                {
+                    var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
+
+                    if (cfg.ContainsKey("database"))
+                    {
+                        var db = Js.Deserialize<Dictionary<string, object>>(cfg["database"].ToString());
+                        string host = db.ContainsKey("host") ? db["host"].ToString() : "localhost";
+                        string dbname = db.ContainsKey("database") ? db["database"].ToString() : "qianduantest";
+                        string user = db.ContainsKey("user") ? db["user"].ToString() : "root";
+                        string pwd = db.ContainsKey("password") ? db["password"].ToString() : "123456";
+                        ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharSet=utf8;";
+                    }
+
+                    // 加载共享服务器配置
+                    if (cfg.ContainsKey("share_server"))
+                    {
+                        var share = Js.Deserialize<Dictionary<string, object>>(cfg["share_server"].ToString());
+                        if (share.ContainsKey("path")) ShareServerPath = share["path"].ToString();
+                        if (share.ContainsKey("local_temp")) LocalTempPath = share["local_temp"].ToString();
+                        if (share.ContainsKey("machine_nc_path")) MachineNcPath = share["machine_nc_path"].ToString();
+                    }
+                }
+
+                // 重新初始化数据库连接（配置可能已变更）
+                Mysql = CommonFactory.CreateInstance(CommonData.mysql, ConnStr);
+            }
+            catch (Exception ex)
+            {
+                Log("WARN", "加载配置失败，使用默认配置: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 更新UI界面日志
+        /// </summary>
+        /// <param name="level"></param>
+        /// <param name="content">日志内容</param>
+        static void Log(string level, string content)
+        {
+            string msg = "[" + level + "] " + content;
+            Console.WriteLine(msg);
+
+            try
+            {
+                var body = Js.Serialize(new { step = StepName, displayName = DisplayName, level, content = msg });
+                var bytes = Encoding.UTF8.GetBytes(body);
+                var req = WebRequest.CreateHttp(ApiBase + "/api/sub/log");
+                req.Method = "POST";
+                req.ContentType = "application/json";
+                req.Timeout = 3000;
+                using (var rs = req.GetRequestStream())
+                    rs.Write(bytes, 0, bytes.Length);
+                try { req.GetResponse().Close(); } catch { }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 读取 Excel(.xlsx) 指定单元格内容
+        /// 基于 Open XML 格式，无需外部依赖
+        /// </summary>
+        /// <param name="filePath">.xlsx 文件路径</param>
+        /// <param name="cellRef">单元格编号，如 "A1"、"B5"</param>
+        /// <returns>单元格文本内容，失败返回空字符串</returns>
+        public static string ReadExcelCell(string filePath, string cellRef)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                    return "";
+
+                string colLetters = "", rowStr = "";
+                foreach (char c in cellRef.ToUpper())
+                {
+                    if (c >= 'A' && c <= 'Z') colLetters += c;
+                    else rowStr += c;
+                }
+                int row = int.Parse(rowStr);
+
+                using (var zip = ZipFile.OpenRead(filePath))
+                {
+                    var sstEntry = zip.GetEntry("xl/sharedStrings.xml");
+                    List<string> sharedStrings = new List<string>();
+                    if (sstEntry != null)
+                    {
+                        using (var stream = sstEntry.Open())
+                        {
+                            var sstDoc = XDocument.Load(stream);
+                            sharedStrings = sstDoc.Descendants()
+                                .Where(e => e.Name.LocalName == "t")
+                                .Select(e => e.Value).ToList();
+                        }
+                    }
+
+                    var sheetEntry = zip.GetEntry("xl/worksheets/sheet1.xml");
+                    if (sheetEntry == null) return "";
+                    using (var stream = sheetEntry.Open())
+                    {
+                        var sheetDoc = XDocument.Load(stream);
+                        var ns = sheetDoc.Root.Name.Namespace;
+                        var rowElems = sheetDoc.Descendants(ns + "row")
+                            .Where(r => (string)r.Attribute("r") == row.ToString());
+                        foreach (var rowElem in rowElems)
+                        {
+                            var cell = rowElem.Elements(ns + "c")
+                                .FirstOrDefault(c => (string)c.Attribute("r") == cellRef.ToUpper());
+                            if (cell != null)
+                            {
+                                var valElem = cell.Element(ns + "v");
+                                if (valElem == null) return "";
+                                string val = valElem.Value;
+                                string type = (string)cell.Attribute("t");
+                                if (type == "s" && int.TryParse(val, out int idx) && idx < sharedStrings.Count)
+                                    return sharedStrings[idx];
+                                return val;
+                            }
+                        }
+                    }
+                }
+                return "";
+            }
+            catch { return ""; }
+        }
+    }
+}

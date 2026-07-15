@@ -1,0 +1,31 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Build outputs (recursive)
+**/bin/
+**/obj/
+*.pdb
+*.cache
+
+# NuGet
+packages/
+
+# VS Code
+.vscode/
+
+# Temporary
+*.tmp
+*.swp
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Test data
+测试照片/
+新建文件夹/

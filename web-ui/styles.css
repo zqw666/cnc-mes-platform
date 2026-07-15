@@ -1,0 +1,562 @@
+﻿*{box-sizing:border-box;margin:0;padding:0;font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif}
+:root{--sidebar-width:220px;--sidebar-collapsed:64px;--header-height:56px;--bg:#f4f6f8;--accent:#2b79ff}
+body,html{height:100%}
+.header{height:var(--header-height);display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#fff;border-bottom:1px solid #e6e9ee;position:fixed;left:0;right:0;top:0;z-index:20}
+.header-left{display:flex;align-items:center;gap:12px}
+.toggle-btn{font-size:18px;padding:8px 10px;border-radius:6px;border:1px solid #e0e6f0;background:#fafbff;cursor:pointer}
+.datetime{font-weight:600;color:#333}
+.header-right{display:flex;align-items:center;gap:16px;color:#444}
+.username{font-size:14px}
+.net-status{font-size:13px}
+.net-status .online{color:green}
+.net-status .offline{color:crimson}
+.header-center{display:flex;align-items:center;justify-content:center;flex:1}
+.header-center .gree-logo{display:flex;align-items:center;justify-content:center}
+.gree-logo-img{height:auto;max-height:calc(var(--header-height) - 12px);width:auto;display:block;object-fit:contain}
+/* 保证 logo 不超出状态栏高度，并保持纵横比 */
+.container{display:flex;height:calc(100vh - var(--header-height));padding-top:var(--header-height)}
+.sidebar{width:var(--sidebar-width);background:#ffffff;border-right:1px solid #e6e9ee;padding-top:18px;transition:width .22s ease}
+.sidebar.collapsed{width:var(--sidebar-collapsed)}
+.menu{list-style:none;display:flex;flex-direction:column;align-items:center;gap:8px}
+.menu-item{padding:12px;cursor:pointer;color:#2b2f36;display:flex;align-items:center;justify-content:center;width:100%}
+.menu-item:hover{background:#f1f5ff;border-radius:6px}
+.menu-item.active{background:#eef4ff;color:var(--accent);font-weight:600;border-radius:6px}
+.menu-item svg{display:block}
+.main{flex:1;padding:18px;background:var(--bg);overflow:auto;padding-bottom:calc(var(--controls-height,96px) + 40px)}
+.section{display:none;padding:12px;background:#fff;border-radius:8px;min-height:200px}
+.section.active{display:block}
+
+/* 任务管理样式 */
+.task-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.task-toolbar .actions{display:flex;align-items:center;gap:8px}
+.task-toolbar .filters label{margin-right:8px;font-size:13px;color:#333}
+.task-toolbar input[type=text]{padding:6px 8px;border:1px solid #d9e0ef;border-radius:6px}
+.small-btn{padding:6px 10px;border-radius:6px;border:1px solid #dfe7ff;background:var(--accent);color:#fff;cursor:pointer}
+.task-table-wrap{overflow:auto;border:1px solid #eef1f6;border-radius:8px;background:#fff}
+.task-table{width:100%;border-collapse:collapse;min-width:900px}
+.task-table{width:100%;border-collapse:collapse;min-width:900px;table-layout:fixed}
+.task-table thead th{padding:10px 12px;background:#fafbff;border-bottom:1px solid #e6e9ee;text-align:center}
+.task-table tbody td{padding:10px 12px;border-bottom:1px solid #f3f6fb;text-align:center;vertical-align:middle}
+.col-select{width:56px;text-align:center}
+.col-no{width:64px;text-align:center}
+.task-table thead th:nth-child(n+3), .task-table tbody td:nth-child(n+3){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task-table tbody tr:hover{background:#fbfdff}
+.icon-btn{padding:6px 10px;border-radius:6px;border:1px solid #dfe7ff;background:transparent;cursor:pointer}
+.task-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.page-numbers{display:flex;gap:6px;align-items:center}
+.page-numbers button{padding:6px 10px;border-radius:6px;border:1px solid #dfe7ff;background:#fff;cursor:pointer}
+.pager{display:flex;align-items:center;gap:8px}
+.page-numbers button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pager-info{color:#6b7280;font-size:13px}
+
+/* ===== 主界面布局 ===== */
+.home-layout{display:flex;gap:16px;align-items:flex-start;margin-bottom:18px}
+
+/* ===== 实时日志框样式 ===== */
+.log-panel{background:#fff;border:1px solid #e6e9ee;border-radius:8px;width:320px;min-width:280px;height:60vh;box-shadow:0 1px 4px rgba(20,30,60,0.04);display:flex;flex-direction:column;overflow:hidden}
+.log-panel-header{background:linear-gradient(135deg,#f8fafc 0%,#f1f5f9 100%);padding:10px 14px;border-bottom:1px solid #e6e9ee;display:flex;justify-content:space-between;align-items:center}
+.log-panel-title{font-weight:700;color:#243140;font-size:14px}
+.log-clear-btn{background:#f1f5f9;border:1px solid #d1d5db;color:#6b7280;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;transition:all 0.2s}
+.log-clear-btn:hover{background:#e5e7eb;color:#374151}
+.log-panel-body{flex:1;overflow-y:auto;overflow-x:hidden;background:#fafbfc}
+.home-log-table{width:100%;border-collapse:collapse;font-size:12px}
+.home-log-table thead{position:sticky;top:0;background:#f1f5f9;z-index:1}
+.home-log-table th{padding:8px 6px;text-align:left;font-weight:600;color:#4b5563;border-bottom:1px solid #e5e7eb;white-space:nowrap}
+.home-log-table td{padding:6px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+.home-log-table tbody tr{transition:background 0.2s}
+.home-log-table tbody tr:hover{background:#f8fafc}
+.home-log-table tbody tr.new-log{background:#fffbe6;animation:fadeIn 0.3s}
+@keyframes fadeIn{from{opacity:0;background:#fff9c4}to{opacity:1;background:#fffbe6}}
+
+/* 日志列宽 */
+.log-col-time{width:70px;white-space:nowrap;color:#6b7280;font-size:11px}
+.log-col-content{max-width:180px;word-break:break-all;color:#374151;line-height:1.4}
+.log-col-type{width:60px;text-align:center}
+
+/* 日志类型标签 */
+.log-type-tag{display:inline-block;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:500}
+.log-type-tag.info{background:#e0f2fe;color:#0369a1}
+.log-type-tag.success{background:#dcfce7;color:#15803d}
+.log-type-tag.warn{background:#fef3c7;color:#b45309}
+.log-type-tag.error{background:#fee2e2;color:#b91c1c}
+.log-type-tag.robot{background:#f3e8ff;color:#7c3aed}
+
+/* 滚动条样式 */
+.log-panel-body::-webkit-scrollbar{width:6px}
+.log-panel-body::-webkit-scrollbar-track{background:#f1f5f9}
+.log-panel-body::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+.log-panel-body::-webkit-scrollbar-thumb:hover{background:#94a3b8}
+
+/* ===== 设备区域 ===== */
+.devices{display:flex;gap:24px;align-items:flex-start;justify-content:space-between;flex:1 1 0}
+.device-card{background:#fff;border:1px solid #e6e9ee;padding:8px;border-radius:8px;flex:1 1 0;width:30%;height:60vh;box-shadow:0 1px 4px rgba(20,30,60,0.04);text-align:center;display:flex;flex-direction:column}
+.device-card img{width:100%;height:100%;flex:1 1 auto;min-height:0;object-fit:scale-down;border-radius:6px}
+/* 状态文字放在图片下方，并保证高度一致使两侧水平对齐 */
+.device-status{margin-top:8px;padding:6px 4px;height:46px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#243140}
+
+/* 料架状态自动样式 */
+.status.auto{background:#e8f0ff;color:#0b5fff}
+
+.device-title{margin-top:8px;font-weight:600;color:#243140}
+.device-status{margin-top:6px;color:#4b5563}
+.status{font-weight:700;padding:2px 8px;border-radius:12px}
+.status.normal{background:#eaf6ef;color:#0b7a3a}
+.status.running{background:#fff4e5;color:#b86a00}
+.status.paused{background:#fff0f6;color:#b0003a}
+.status.stopped{background:#ffecec;color:#8b0000}
+.work-stats{margin:28px 0 56px;padding:12px}
+.stat-row{display:flex;gap:0;flex-wrap:nowrap;justify-content:space-between;align-items:stretch;width:100%}
+.stat-item{background:#fff;padding:16px;border-radius:8px;flex:1 1 0;min-width:0;text-align:center;border:1px solid #eef1f6;margin:0 12px}
+.stat-item:first-child{margin-left:0}
+.stat-item:last-child{margin-right:0}
+.stat-label{font-size:12px;color:#6b7280}
+.stat-value{font-size:16px;font-weight:700;color:#111827;margin-top:6px}
+
+/* 颜色：当天已加工数（绿色），未加工数（红色） */
+#processed-count{color:#0b7a3a}
+#unprocessed-count{color:#b0003a}
+.controls{position:fixed;left:var(--sidebar-left, var(--sidebar-width));right:0;bottom:0;display:flex;gap:12px;justify-content:space-around;padding:16px 18px;background:#ffffff;border-top:1px solid #e6e9ee;z-index:40}
+.control-btn{width:64px;height:64px;border-radius:10px;border:1px solid #dfe7ff;background:transparent;color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.control-btn:hover{box-shadow:0 6px 18px rgba(43,121,255,0.12)}
+@media (max-width:700px){.sidebar{position:fixed;left:0;top:var(--header-height);height:calc(100vh - var(--header-height));z-index:25}}
+
+/* 料架管理样式 */
+.shelf-tabs{display:flex;margin-bottom:16px}
+.tab-btn{padding:8px 16px;border:1px solid #dfe7ff;background:#fff;cursor:pointer;border-radius:6px 6px 0 0}
+.tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tab-content{display:none;padding:16px;background:#fff;border-radius:8px}
+.tab-content.active{display:block}
+.shelf-controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px}
+.control-buttons{display:flex;gap:8px}
+.btn{padding:6px 12px;border:1px solid #dfe7ff;background:var(--accent);color:#fff;border-radius:6px;cursor:pointer}
+.status-legend{display:flex;gap:12px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:12px;color:#333}
+.icon{width:16px;height:16px;border-radius:4px;border:1px solid #ccc}
+.shelf-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:12px;padding:16px}
+.shelf-item{display:flex;flex-direction:column;gap:4px;padding:8px;border:2px solid #333;border-radius:4px;background:#fff;min-height:100px;position:relative}
+.shelf-checkbox{position:absolute;top:4px;right:4px;width:16px;height:16px;cursor:pointer;z-index:10}
+.shelf-item:not(.activated) .shelf-checkbox{display:none}
+
+/* 料位方块 - 颜色根据状态 */
+.shelf-item[data-status="processing"]{background-color: #1890ff;border-color: #096dd9;color:#fff}
+.shelf-item[data-status="pending"]{background-color: #faad14;border-color: #d48806;color:#fff}
+.shelf-item[data-status="completed"]{background-color: #52c41a;border-color: #389e0d;color:#fff}
+.shelf-item[data-status="to-scan"]{background-color: #8c8c8c;border-color: #595959;color:#fff}
+.shelf-item[data-status="no-material"]{background-color: #262626;border-color: #000;color:#fff}
+.shelf-item[data-status="error"]{background-color: #f5222d;border-color: #cf1322;color:#fff}
+.shelf-item[data-status="disabled"]{background-color: #d9d9d9;border-color: #bfbfbf;color:#666}
+.shelf-item[data-status="urgent"]{background-color: #fa8c16;border-color: #d46b08;color:#fff}
+
+/* 料位信息行 */
+.shelf-info-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;line-height:1.4}
+.shelf-info-label{font-weight:bold;opacity:0.9}
+.shelf-info-value{opacity:1}
+.shelf-position{font-size:14px;font-weight:bold;text-align:center;margin-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.3);padding-bottom:2px}
+.shelf-rfid{font-size:10px;word-break:break-all;max-height:28px;overflow:hidden}
+.shelf-partname{font-size:10px;word-break:break-all;max-height:28px;overflow:hidden}
+.shelf-status{font-size:11px;font-weight:bold;text-align:center;margin-top:4px;padding-top:2px;border-top:1px solid rgba(255,255,255,0.3)}
+
+/* 料位状态文字映射 */
+.status-text-processing::before{content:"加工中"}
+.status-text-pending::before{content:"待加工"}
+.status-text-completed::before{content:"已完成"}
+.status-text-to-scan::before{content:"待扫描"}
+.status-text-no-material::before{content:"无料"}
+.status-text-error::before{content:"错误"}
+.status-text-disabled::before{content:"禁用"}
+.status-text-urgent::before{content:"急件"}
+
+/* 日志查询样式 */
+.log-toolbar{margin-bottom:16px}
+.log-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.log-filters label{font-size:13px;color:#333;display:flex;align-items:center;gap:6px}
+.log-filters input[type="datetime-local"],.log-filters input[type="text"],.log-filters select{padding:6px 8px;border:1px solid #d9e0ef;border-radius:6px;font-size:13px}
+.log-filters select{min-width:120px}
+.log-table-wrap{overflow:auto;border:1px solid #eef1f6;border-radius:8px;background:#fff}
+.log-table{width:100%;border-collapse:collapse;min-width:800px}
+.log-table thead th{padding:10px 12px;background:#fafbff;border-bottom:1px solid #e6e9ee;text-align:center}
+.log-table tbody td{padding:10px 12px;border-bottom:1px solid #f3f6fb;vertical-align:middle}
+.log-table .col-no{width:64px;text-align:center}
+.log-table .log-message{text-align:left;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-table tbody tr:hover{background:#fbfdff}
+.log-type-badge{padding:2px 8px;border-radius:12px;font-size:12px}
+.log-type-badge.type-system{background:#e8f0ff;color:#0b5fff}
+.log-type-badge.type-robot{background:#e8ffe8;color:#0b7a3a}
+.log-type-badge.type-error{background:#ffecec;color:#b0003a}
+.log-type-badge.type-warning{background:#fff7e6;color:#d46b08}
+.log-type-badge.type-success{background:#f6ffed;color:#389e0d}
+
+/* 实时日志动画 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.log-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+
+/* ===== 线体配置页面样式 ===== */
+.config-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e6e9ee}
+.config-toolbar-left{display:flex;align-items:center;gap:12px}
+.config-toolbar-right{display:flex;align-items:center;gap:8px}
+.config-page-title{font-size:18px;font-weight:700;color:#243140;margin:0}
+.config-layout{display:flex;gap:0;min-height:500px}
+.config-nav{width:160px;min-width:140px;background:#f8fafc;border:1px solid #e6e9ee;border-radius:8px 0 0 8px;padding:8px 0}
+.config-nav-item{padding:12px 16px;cursor:pointer;color:#4b5563;font-size:14px;border-left:3px solid transparent;transition:all .15s}
+.config-nav-item:hover{background:#eef4ff;color:#2b79ff}
+.config-nav-item.active{background:#eef4ff;color:#2b79ff;font-weight:600;border-left-color:#2b79ff}
+.config-form-area{flex:1;border:1px solid #e6e9ee;border-left:none;border-radius:0 8px 8px 0;padding:20px 24px;overflow-y:auto;max-height:calc(100vh - 240px)}
+.config-group{display:none}
+.config-group.active{display:block}
+.config-group-title{font-size:15px;font-weight:600;color:#243140;margin:0 0 14px 0;padding-bottom:8px;border-bottom:1px solid #f0f0f0}
+.config-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px 24px}
+.config-group-block{margin-bottom:20px}
+.group-label{display:block;font-size:14px;font-weight:600;color:#374151;margin-bottom:10px;padding-left:0}
+.config-form-inline{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.config-field-action{justify-content:flex-end;grid-column:-1/-1}
+.config-field{display:flex;flex-direction:column;gap:4px}
+.config-field-action .btn{align-self:flex-start;padding:6px 20px}
+.config-field label{font-size:13px;color:#6b7280;font-weight:500}
+.config-input{padding:8px 10px;border:1px solid #d9e0ef;border-radius:6px;font-size:14px;color:#243140;transition:border-color .2s;background:#fff}
+.config-input:focus{outline:none;border-color:#2b79ff;box-shadow:0 0 0 2px rgba(43,121,255,0.15)}
+.config-input::placeholder{color:#b0b8c9}
+
+/* PLC分类区块 */
+.plc-section{margin-bottom:20px;padding:14px 16px;background:#fafbfd;border:1px solid #f0f2f5;border-radius:8px}
+.plc-section-title{font-size:14px;font-weight:600;color:#2b79ff;margin:0 0 12px 0;padding-bottom:6px;border-bottom:1px dashed #e0e6f0}
+
+/* 机床列表 */
+.machine-list{display:flex;flex-direction:column;gap:10px}
+.machine-card{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;padding:12px 14px;background:#fafbfd;border:1px solid #e6e9ee;border-radius:8px}
+.machine-card .config-field{min-width:0}
+.machine-card .config-input{width:100%}
+.machine-card .btn-remove-machine{width:30px;height:30px;border-radius:6px;border:1px solid #ffccc7;background:#fff1f0;color:#cf1322;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;align-self:end}
+.machine-card .btn-remove-machine:hover{background:#ffccc7}
+
+/* 随行台料位数-无随行台时隐藏 */
+#cfg-shuttle-slots-field.hidden{display:none}
+.loading-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.7);display:flex;align-items:center;justify-content:center;z-index:10}
+.spinner{width:40px;height:40px;border:4px solid #e0e0e0;border-top-color:#2b79ff;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* ===== 线体配置页面新布局 ===== */
+.config-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  height: calc(100vh - var(--header-height) - var(--controls-height, 96px) - 40px);
+  overflow-y: auto;
+}
+
+.config-section {
+  background: #fff;
+  border: 1px solid #e6e9ee;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 0;
+}
+
+ top-section {
+  /* 顶部section样式 */
+}
+
+.middle-section {
+  /* 中部section样式 */
+}
+
+.bottom-section {
+  /* 底部section样式 */
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #243140;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.config-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-field label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.config-input {
+  padding: 8px 10px;
+  border: 1px solid #d9e0ef;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #243140;
+  transition: border-color .2s;
+  background: #fff;
+}
+
+.config-input:focus {
+  outline: none;
+  border-color: #2b79ff;
+  box-shadow: 0 0 0 2px rgba(43,121,255,0.15);
+}
+
+.config-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.btn-save {
+  background: #2b79ff;
+  color: #fff;
+  border: 1px solid #2b79ff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-load {
+  background: #fff;
+  color: #2b79ff;
+  border: 1px solid #2b79ff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* 线体配置页面新样式 */
+.config-toolbar {
+  display: flex;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid #e6e9ee;
+  margin-bottom: 16px;
+}
+
+.config-toolbar .btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #d9e0ef;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.config-toolbar .btn:hover {
+  background: #f5f7fa;
+}
+
+.config-toolbar .btn-primary {
+  background: #2b79ff;
+  color: #fff;
+  border-color: #2b79ff;
+}
+
+.config-toolbar .btn-primary:hover {
+  background: #1a5fd9;
+}
+
+.config-subsection {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #fafbfd;
+  border: 1px solid #f0f2f5;
+  border-radius: 8px;
+}
+
+.subsection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.subsection-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2b79ff;
+  margin: 0;
+}
+
+.btn-small {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #2b79ff;
+  background: #2b79ff;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.btn-small:hover {
+  background: #1a5fd9;
+  border-color: #1a5fd9;
+}
+
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #e6e9ee;
+  border-radius: 8px;
+  position: relative;
+}
+
+.card-item .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.card-item .card-title {
+  font-weight: 600;
+  color: #1a5fd9;
+  font-size: 14px;
+}
+
+.card-item .card-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.card-item .config-field {
+  min-width: 0;
+}
+
+.card-item .config-input {
+  width: 100%;
+}
+
+.btn-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid #ffccc7;
+  background: #fff1f0;
+  color: #cf1322;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-remove:hover {
+  background: #ffccc7;
+}
+
+.signal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.field-wide {
+  grid-column: span 2;
+}
+
+/* 系统工作流定义表格 */
+.workflow-table-wrap {
+  overflow-x: auto;
+}
+
+.workflow-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #e6e9ee;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.workflow-table th,
+.workflow-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #f0f2f5;
+  font-size: 13px;
+}
+
+.workflow-table thead th {
+  background: #f5f8ff;
+  color: #2b79ff;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.workflow-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.workflow-table .wf-seq {
+  width: 48px;
+  color: #8c9bb5;
+  text-align: center;
+}
+
+.workflow-table .wf-name .config-input {
+  width: 100%;
+}
+
+.workflow-table .wf-enabled {
+  width: 70px;
+  text-align: center;
+}
+
+.workflow-table .wf-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #2b79ff;
+}
+
+.workflow-table .wf-priority {
+  width: 90px;
+}
+
+.workflow-table .wf-priority .config-input {
+  width: 80px;
+}
+
+.workflow-table .wf-op {
+  width: 50px;
+  text-align: center;
+}
+
+.workflow-table .wf-op .btn-remove {
+  position: static;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .field-wide {
+    grid-column: span 1;
+  }
+}

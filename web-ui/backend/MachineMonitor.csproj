@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <OutputPath></OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="DataCommonOperate">
+      <HintPath>..\..\CommonOperateDll\CommonOperateDll\DataCommonOperate\bin\Debug\DataCommonOperate.dll</HintPath>
+    </Reference>
+    <Reference Include="MySql.Data">
+      <HintPath>..\MySql.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+    <!-- 直接引用 MySql.Data 8.3.0 (支持 MySQL 8.x utf8mb3) -->
+  </ItemGroup>
+  <!-- 自动复制config.json到输出目录 -->
+  <ItemGroup>
+    <None Update="config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <!-- 排除所有子程序目录，避免编译冲突 -->
+  <ItemGroup>
+    <Compile Remove="bin\**" />
+    <Compile Remove="obj\**" />
+    <Compile Remove="subs\**" />
+  </ItemGroup>
+</Project>

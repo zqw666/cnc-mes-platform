@@ -1,0 +1,585 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>管理界面示例</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/element-ui@2.15.14/lib/theme-chalk/index.css" />
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-left">
+      <button id="toggle-btn" class="toggle-btn">☰</button>
+      <div id="datetime" class="datetime">--</div>
+    </div>
+    <div class="header-center">
+      <img id="gree-logo-img" class="gree-logo-img" src="格力.png" alt="格力" />
+    </div>
+    <div class="header-right">
+      <div id="username" class="username">用户: 示例用户</div>
+      <div id="net-status" class="net-status">状态: <span id="net-indicator" class="online">在线</span></div>
+    </div>
+  </div>
+
+  <div class="container">
+    <aside id="sidebar" class="sidebar">
+      <ul class="menu">
+        <li class="menu-item active" data-section="home" aria-label="主界面">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 11.5L12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5z" fill="#2b2f36"/></svg>
+        </li>
+        <li class="menu-item" data-section="tasks" aria-label="任务管理">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 11l2 2 4-4" stroke="#2b2f36" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11" stroke="#2b2f36" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </li>
+        <li class="menu-item" data-section="shelves" aria-label="料架管理">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="4" rx="1" stroke="#2b2f36" stroke-width="1.4" fill="none"/><rect x="3" y="10" width="18" height="4" rx="1" stroke="#2b2f36" stroke-width="1.4" fill="none"/><rect x="3" y="16" width="18" height="4" rx="1" stroke="#2b2f36" stroke-width="1.4" fill="none"/></svg>
+        </li>
+        <li class="menu-item" data-section="logs" aria-label="日志查询">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#2b2f36" stroke-width="1.4" fill="none"/><path d="M21 21l-4.35-4.35" stroke="#2b2f36" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </li>
+        <li class="menu-item" data-section="lineconfig" aria-label="线体配置">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#2b2f36" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </li>
+      </ul>
+    </aside>
+
+    <main id="main" class="main">
+
+      <!-- ===== 主界面 ===== -->
+      <section id="home" class="section active">
+        <div class="home-layout">
+          <!-- 实时日志框 -->
+          <div class="log-panel">
+            <div class="log-panel-header">
+              <span class="log-panel-title">📋 实时日志</span>
+              <button id="btn-clear-home-log" class="log-clear-btn" title="清空日志">清空</button>
+            </div>
+            <div class="log-panel-body" id="home-log-body">
+              <table class="home-log-table">
+                <thead>
+                  <tr>
+                    <th class="log-col-time">时间</th>
+                    <th class="log-col-content">日志内容</th>
+                    <th class="log-col-type">类型</th>
+                  </tr>
+                </thead>
+                <tbody id="home-log-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 设备区域 -->
+          <div class="devices">
+            <div class="device-card">
+              <img id="machine-img" src="罗德斯.png" alt="罗德斯机床" />
+              <div class="device-status">状态：<span id="machine-status" class="status normal">正常</span></div>
+            </div>
+            <div class="device-card">
+              <img id="shelf-img" src="料架.png" alt="料架" />
+              <div class="device-status">状态：<span id="shelf-status" class="status auto">自动</span></div>
+            </div>
+            <div class="device-card">
+              <img id="robot-img" src="机器人.png" alt="UR-20机器人" />
+              <div class="device-status">状态：<span id="robot-status" class="status normal">正常</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="work-stats">
+          <div class="stat-row">
+            <div class="stat-item">
+              <div class="stat-label">加工零件名称</div>
+              <div class="stat-value" id="part-name" style="color:#2b79ff">示例零件 A</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">加工时长</div>
+              <div class="stat-value" id="process-duration">00:00:00</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">当天已加工数</div>
+              <div class="stat-value" id="processed-count">0</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">未加工数</div>
+              <div class="stat-value" id="unprocessed-count">0</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 任务管理 ===== -->
+      <section id="tasks" class="section">
+        <div class="task-toolbar">
+          <div class="filters">
+            <label>工装编号: <input id="filter-tool" type="text" placeholder="请输入工装编号"></label>
+            <label>模号: <input id="filter-mold" type="text" placeholder="请输入模号"></label>
+            <button id="btn-filter" class="small-btn">查询</button>
+          </div>
+          <div class="actions">
+            <button id="btn-top" class="small-btn">置顶选中</button>
+          </div>
+        </div>
+        <div class="task-table-wrap">
+          <table id="task-table" class="task-table">
+            <thead>
+              <tr>
+                <th class="col-select"><input id="select-all" type="checkbox" title="双击全选"></th>
+                <th class="col-no">序号</th>
+                <th>加工零件监控编号</th>
+                <th>加工零件名称</th>
+                <th>工装编号</th>
+                <th>模号</th>
+                <th>加工机台名称</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="task-footer">
+          <div class="pager">
+            <button id="prev-page" class="icon-btn">◀</button>
+            <div id="page-numbers" class="page-numbers"></div>
+            <button id="next-page" class="icon-btn">▶</button>
+          </div>
+          <div class="pager-info">每页最多显示 50 行</div>
+        </div>
+      </section>
+
+      <!-- ===== 料架管理 ===== -->
+      <section id="shelves" class="section">
+        <div class="shelf-tabs">
+          <button class="tab-btn active" data-tab="electrode">电极料架</button>
+          <button class="tab-btn" data-tab="tool">刀具料架</button>
+          <button class="tab-btn" data-tab="steel">钢件料架</button>
+          <button class="tab-btn" data-tab="pallet">托盘料架</button>
+        </div>
+
+        <!-- 电极料架 -->
+        <div class="tab-content active" id="electrode-tab">
+          <div class="shelf-controls">
+            <div class="control-buttons">
+              <button class="btn" id="electrode-select-all">全选</button>
+              <button class="btn" id="electrode-activate">激活</button>
+              <button class="btn" id="electrode-lock">锁定</button>
+              <button class="btn" id="electrode-disable">禁用</button>
+              <button class="btn" id="electrode-no-material">无料</button>
+            </div>
+            <div class="status-legend">
+              <div class="legend-item"><div class="icon disabled"></div>禁用</div>
+              <div class="legend-item"><div class="icon no-material"></div>无料</div>
+              <div class="legend-item"><div class="icon" style="background-color:blue"></div>加工中</div>
+              <div class="legend-item"><div class="icon" style="background-color:yellow"></div>待加工</div>
+              <div class="legend-item"><div class="icon" style="background-color:green"></div>加工完成</div>
+              <div class="legend-item"><div class="icon" style="background-color:gray"></div>待扫描</div>
+              <div class="legend-item"><div class="icon" style="background-color:red"></div>错误</div>
+            </div>
+          </div>
+          <div class="shelf-grid" id="electrode-grid"></div>
+        </div>
+
+        <!-- 刀具料架 -->
+        <div class="tab-content" id="tool-tab">
+          <div class="shelf-controls">
+            <div class="control-buttons">
+              <button class="btn" id="tool-select-all">全选</button>
+              <button class="btn" id="tool-activate">激活</button>
+              <button class="btn" id="tool-lock">锁定</button>
+              <button class="btn" id="tool-disable">禁用</button>
+              <button class="btn" id="tool-no-material">无料</button>
+            </div>
+            <div class="status-legend">
+              <div class="legend-item"><div class="icon disabled"></div>禁用</div>
+              <div class="legend-item"><div class="icon no-material"></div>无料</div>
+              <div class="legend-item"><div class="icon" style="background-color:blue"></div>加工中</div>
+              <div class="legend-item"><div class="icon" style="background-color:yellow"></div>待加工</div>
+              <div class="legend-item"><div class="icon" style="background-color:green"></div>加工完成</div>
+              <div class="legend-item"><div class="icon" style="background-color:red"></div>错误</div>
+            </div>
+          </div>
+          <div class="shelf-grid" id="tool-grid"></div>
+        </div>
+
+        <!-- 钢件料架 -->
+        <div class="tab-content" id="steel-tab">
+          <div class="shelf-controls">
+            <div class="control-buttons">
+              <button class="btn" id="steel-select-all">全选</button>
+              <button class="btn" id="steel-activate">激活</button>
+              <button class="btn" id="steel-lock">锁定</button>
+              <button class="btn" id="steel-disable">禁用</button>
+              <button class="btn" id="steel-urgent">急件</button>
+              <button class="btn" id="steel-no-material">无料</button>
+            </div>
+            <div class="status-legend">
+              <div class="legend-item"><div class="icon disabled"></div>禁用</div>
+              <div class="legend-item"><div class="icon no-material"></div>无料</div>
+              <div class="legend-item"><div class="icon" style="background-color:blue"></div>加工中</div>
+              <div class="legend-item"><div class="icon" style="background-color:yellow"></div>待加工</div>
+              <div class="legend-item"><div class="icon" style="background-color:green"></div>加工完成</div>
+              <div class="legend-item"><div class="icon" style="background-color:gray"></div>待扫描</div>
+              <div class="legend-item"><div class="icon" style="background-color:red"></div>错误</div>
+              <div class="legend-item"><div class="icon" style="background-color:orange"></div>急件</div>
+            </div>
+          </div>
+          <div class="shelf-grid" id="steel-grid"></div>
+        </div>
+
+        <!-- 托盘料架 -->
+        <div class="tab-content" id="pallet-tab">
+          <div class="shelf-controls">
+            <div class="control-buttons">
+              <button class="btn" id="pallet-select-all">全选</button>
+              <button class="btn" id="pallet-activate">激活</button>
+              <button class="btn" id="pallet-lock">锁定</button>
+              <button class="btn" id="pallet-disable">禁用</button>
+              <button class="btn" id="pallet-no-material">无料</button>
+            </div>
+            <div class="status-legend">
+              <div class="legend-item"><div class="icon disabled"></div>禁用</div>
+              <div class="legend-item"><div class="icon no-material"></div>无料</div>
+              <div class="legend-item"><div class="icon" style="background-color:blue"></div>加工中</div>
+              <div class="legend-item"><div class="icon" style="background-color:yellow"></div>待加工</div>
+              <div class="legend-item"><div class="icon" style="background-color:green"></div>加工完成</div>
+              <div class="legend-item"><div class="icon" style="background-color:red"></div>错误</div>
+            </div>
+          </div>
+          <div class="shelf-grid" id="pallet-grid"></div>
+        </div>
+      </section>
+
+      <!-- ===== 日志查询 ===== -->
+      <section id="logs" class="section">
+        <div class="log-toolbar">
+          <div class="log-filters">
+            <label>开始时间: <input id="log-start-time" type="datetime-local"></label>
+            <label>结束时间: <input id="log-end-time" type="datetime-local"></label>
+            <label>日志类型:
+              <select id="log-type">
+                <option value="">全部</option>
+                <option value="INFO">系统日志</option>
+                <option value="ROBOT">机器人日志</option>
+                <option value="ERROR">错误日志</option>
+              </select>
+            </label>
+            <label>关键字: <input id="log-keyword" type="text" placeholder="请输入关键字"></label>
+            <button id="btn-log-search" class="small-btn">查询</button>
+            <button id="btn-log-reset" class="small-btn">重置</button>
+          </div>
+        </div>
+        <div class="log-table-wrap">
+          <table id="log-table" class="log-table">
+            <thead>
+              <tr>
+                <th class="col-no">序号</th>
+                <th>时间</th>
+                <th>日志类型</th>
+                <th>内容</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="log-footer">
+          <div class="pager">
+            <button id="log-prev-page" class="icon-btn">◀</button>
+            <div id="log-page-numbers" class="page-numbers"></div>
+            <button id="log-next-page" class="icon-btn">▶</button>
+          </div>
+          <div class="pager-info">每页显示 50 条</div>
+        </div>
+      </section>
+
+
+      <!-- ===== 线体配置 ===== -->
+      <section id="lineconfig" class="section">
+        <div class="config-container">
+          <div class="config-toolbar">
+            <button class="btn btn-primary" onclick="saveLineConfig()">保存配置</button>
+            <button class="btn btn-primary" onclick="resetLineConfig()">重置</button>
+            <button class="btn btn-primary" onclick="importLineConfigExcel()">导入Excel</button>
+            <button class="btn btn-primary" onclick="exportLineConfigExcel()">导出Excel</button>
+            <input type="file" id="lineconfig-excel-input" accept=".xlsx,.xls" style="display:none" onchange="handleLineConfigExcel(event)">
+          </div>
+
+          <!-- 顶部：线体配置栏 -->
+          <div class="config-section">
+            <h3 class="section-title">线体配置</h3>
+            <!-- 夹爪系统组 -->
+            <div class="config-group-block">
+              <span class="group-label">夹爪系统</span>
+              <div class="config-grid config-form-inline">
+                <div class="config-field">
+                  <label>夹爪类型</label>
+                  <select class="config-input" id="cfg-gripper-type" onchange="onGripperTypeChange()">
+                    <option value="fixed-single">固定单爪</option>
+                    <option value="fixed-double">固定双爪</option>
+                    <option value="quick-electrode">快换爪（电极）</option>
+                    <option value="quick-tool">快换爪（刀具）</option>
+                    <option value="quick-pallet">快换爪（托盘）</option>
+                  </select>
+                </div>
+                <div class="config-field" id="grab-mode-field">
+                  <label>抓取方式</label>
+                  <select class="config-input" id="cfg-grab-mode">
+                    <option value="A-grab-B-place">A抓B放</option>
+                    <option value="B-grab-A-place">B抓A放</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- 夹爪列表（快换模式时显示） -->
+            <div class="config-subsection" id="gripper-section" style="display:none">
+              <div class="subsection-header">
+                <h4 class="subsection-title">夹爪配置</h4>
+                <button class="btn-small" onclick="addGripper()">+ 添加夹爪</button>
+              </div>
+              <div id="gripper-list" class="card-list">
+                <!-- 夹爪配置卡片，JS动态生成 -->
+              </div>
+            </div>
+
+            <!-- 料架列表（支持多个） -->
+            <div class="config-subsection">
+              <div class="subsection-header">
+                <h4 class="subsection-title">料架配置</h4>
+                <button class="btn-small" onclick="addRack()">+ 添加料架</button>
+              </div>
+              <div id="rack-list" class="card-list">
+                <!-- 料架配置卡片模板，由JS动态生成 -->
+              </div>
+            </div>
+
+            <!-- 机床列表（支持多个） -->
+            <div class="config-subsection">
+              <div class="subsection-header">
+                <h4 class="subsection-title">机床配置</h4>
+                <button class="btn-small" onclick="addMachine()">+ 添加机床</button>
+              </div>
+              <div id="machine-list" class="card-list">
+                <!-- 机床配置卡片模板，由JS动态生成 -->
+              </div>
+            </div>
+          </div>
+
+          <!-- 中部：PLC信号配置栏 -->
+          <div class="config-section">
+            <h3 class="section-title">PLC信号配置</h3>
+            <div class="config-grid">
+              <div class="config-field">
+                <label>PLC IP地址</label>
+                <input type="text" class="config-input" id="cfg-plc-ip" placeholder="例如：192.168.1.100">
+              </div>
+              <div class="config-field">
+                <label>PLC端口</label>
+                <input type="number" class="config-input" id="cfg-plc-port" value="502">
+              </div>
+            </div>
+
+            <!-- 机器人信号 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">机器人信号</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>机器人光电信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-robot-photo" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>任务开始信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-robot-task-start" placeholder="如：100.01">
+                </div>
+                <div class="config-field">
+                  <label>任务完成信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-robot-task-done" placeholder="如：100.02">
+                </div>
+                <div class="config-field">
+                  <label>任务号地址</label>
+                  <input type="text" class="config-input" id="cfg-signal-robot-task-number" placeholder="如：D200">
+                </div>
+                <div class="config-field">
+                  <label>机器人报错信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-robot-error" placeholder="如：100.03">
+                </div>
+                <div class="config-field">
+                  <label>安全位置信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-robot-safe-pos" placeholder="如：100.04">
+                </div>
+                <div class="config-field">
+                  <label>急停触发信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-robot-estop" placeholder="如：100.05">
+                </div>
+              </div>
+            </div>
+
+
+            <!-- 随行台信号 -->
+            <div class="config-subsection" id="pallet-signals-section">
+              <h4 class="subsection-title">随行台信号</h4>
+              <div class="config-grid config-form-inline">
+                <div class="config-field">
+                  <label>随行台</label>
+                  <select class="config-input" id="cfg-pallet-enabled">
+                    <option value="yes">有</option>
+                    <option value="no">无</option>
+                  </select>
+                </div>
+                <div class="config-field" id="pallet-slots-field">
+                  <label>随行台料位数</label>
+                  <input type="number" class="config-input" id="cfg-pallet-slots" min="1" value="4">
+                </div>
+              </div>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>随行台起始位光电信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-pallet-slot-photo" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>随行台取开始任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-pallet-grab-task" placeholder="如：D500">
+                </div>
+                <div class="config-field">
+                  <label>随行台放开始任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-pallet-place-task" placeholder="如：D600">
+                </div>
+                <div class="config-field">
+                  <label>随行台光电开始信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-pallet-photo-start" placeholder="如：100.01">
+                </div>
+              </div>
+            </div>
+
+            <!-- 预设台信号 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">预设台信号</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>预设台光电信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-photo" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>人工操作信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-manual" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>请求开门信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-open-request" placeholder="如：100.02">
+                </div>
+                <div class="config-field">
+                  <label>允许开门信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-open-allow" placeholder="如：100.03">
+                </div>
+                <div class="config-field">
+                  <label>预设台取任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-grab-task" placeholder="如：D700">
+                </div>
+                <div class="config-field">
+                  <label>预设台放任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-place-task" placeholder="如：D800">
+                </div>
+                <div class="config-field">
+                  <label>门锁状态信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-door-lock" placeholder="如：100.04">
+                </div>
+              </div>
+            </div>
+
+            <!-- 工件旋转台信号 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">工件旋转台信号</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>旋转台旋转信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-rotary-rotate" placeholder="如：108.00">
+                </div>
+                <div class="config-field">
+                  <label>读取零点信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-rotary-zero" placeholder="如：108.01">
+                </div>
+                <div class="config-field">
+                  <label>取任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-rotary-grab-task" placeholder="如：D900">
+                </div>
+                <div class="config-field">
+                  <label>放任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-rotary-place-task" placeholder="如：D1000">
+                </div>
+                <div class="config-field">
+                  <label>到位信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-rotary-arrive" placeholder="如：108.02">
+                </div>
+              </div>
+            </div>
+
+            <!-- 清洁站信号 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">清洁站信号</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>清洁位光电信号</label>
+                  <input type="text" class="config-input" id="cfg-signal-clean-photo" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>清洁站取任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-clean-grab-task" placeholder="如：D1100">
+                </div>
+                <div class="config-field">
+                  <label>清洁站放任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-clean-place-task" placeholder="如：D1200">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 系统工作流定义 -->
+          <div class="config-section">
+            <h3 class="section-title">系统工作流定义</h3>
+            <div class="config-subsection">
+              <div class="subsection-header">
+                <h4 class="subsection-title">工作流步骤</h4>
+                <button class="btn-small" onclick="addWorkflowStep()">+ 添加步骤</button>
+              </div>
+              <div class="workflow-table-wrap">
+                <table class="workflow-table">
+                  <thead>
+                    <tr>
+                      <th class="wf-seq">序号</th>
+                      <th class="wf-name">流程名称</th>
+                      <th class="wf-enabled">是否执行</th>
+                      <th class="wf-priority">优先级</th>
+                      <th class="wf-op">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="workflow-list"></tbody>
+                </table>
+              </div>
+              <p class="config-hint">按列表顺序作为默认执行顺序；优先级数值越大越优先（同优先级内按序号执行）。勾选“是否执行”才会纳入工作流。</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 底部控制栏（固定在页面底部，不遮挡主内容） -->
+  <div class="controls" id="controls-bar">
+    <button id="btn-start" class="control-btn" title="启动">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button id="btn-pause" class="control-btn" title="暂停">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+    <button id="btn-stop" class="control-btn" title="停止">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+    </button>
+    <button id="btn-reset" class="control-btn" title="复位">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M13 3a9 9 0 1 0 6.32 15.32l1.42-1.42A11 11 0 1 1 13 1v2z"/></svg>
+    </button>
+  </div>
+  <script src="https://unpkg.com/vue@2.7.14/dist/vue.min.js"></script>
+  <script src="https://unpkg.com/element-ui@2.15.14/lib/index.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
+
