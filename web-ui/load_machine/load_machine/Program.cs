@@ -85,33 +85,69 @@ namespace load_machine
                 }
                 Log("INFO", "PLC 连接成功");
 
-                // 初始化机床1：开门→发送652任务→关门
-                InitMachine1Task();
-
                 List<string> waitmaclist = Waitmaclist();
-                List<string> followpiecelist = FollowHavePieceList();
-                if (waitmaclist.Count > 0 && followpiecelist.Count > 0)
+                if (waitmaclist.Count == 0)
                 {
-                    // 1. 执行置换夹爪流程
-                    if (!ChangeGripper())
+                    Log("INFO", "无待机机床，退出上机流程");
+                    return;
+                }
+
+                // 确定工件来源：有随行台 → 从随行台取料，无随行台 → 从机器人夹爪取料
+                bool hasShuttle = HasShuttle();
+                List<string> followpiecelist = null;
+                string robotPieceName = null;
+
+                if (hasShuttle)
+                {
+                    followpiecelist = FollowHavePieceList();
+                    if (followpiecelist.Count == 0)
                     {
-                        Log("ERROR", "置换夹爪失败，退出扫描流程");
-                        ProcessTermination = true;
+                        Log("INFO", "有随行台但无待上机工件，退出上机流程");
                         return;
                     }
+                    Log("INFO", "随行台模式：共 " + followpiecelist.Count + " 个待上机工件");
+                }
+                else
+                {
+                    robotPieceName = GetRobotMessagePieceMessage();
+                    if (string.IsNullOrEmpty(robotPieceName))
+                    {
+                        Log("INFO", "无随行台且机器人夹爪无工件，退出上机流程");
+                        return;
+                    }
+                    Log("INFO", "无随行台，机器人夹爪有工件: " + robotPieceName);
+                }
 
+                // 1. 执行置换夹爪流程
+                if (!ChangeGripper())
+                {
+                    Log("ERROR", "置换夹爪失败，退出上机流程");
+                    ProcessTermination = true;
+                    return;
+                }
+
+                if (hasShuttle)
+                {
+                    // ===== 有随行台：从随行台取料 → 放机床 =====
                     for (int i = 0; i < waitmaclist.Count; i++)
                     {
-                        if (ProcessTermination)
-                            break;
+                        if (ProcessTermination) break;
                         for (int j = 0; j < followpiecelist.Count; j++)
                         {
-                            if (ProcessTermination)
-                                break;
+                            if (ProcessTermination) break;
                             int macnum = Convert.ToInt16(waitmaclist[i].Split(',')[0]);
                             string ip = waitmaclist[i].Split(',')[1];
+
+                            // 检查机床上是否已有工件，有则跳过
+                            if (MachineHasPiece(macnum))
+                            {
+                                Log("INFO", "机床" + macnum + " 上已有工件，跳过该机床");
+                                break;
+                            }
+
                             int followpos = Convert.ToInt16(followpiecelist[j].Split(',')[0]);
                             string workpiecename = followpiecelist[j].Split(',')[1];
+
                             if (!ExecuteTask(followpos))
                             {
                                 Log("ERROR", "机器人执行从随行台" + followpos + "料位抓取任务失败，退出上机流程！");
@@ -122,7 +158,6 @@ namespace load_machine
                                 Log("ERROR", "更新随行台" + followpos + "料位信息失败！");
                             if (!Updaterobotmessage(workpiecename, 2))
                                 Log("ERROR", "更新机器人手爪信息失败！");
-                            // roders机床先开门
                             if (!OpenMachineDoorIfRoders(macnum))
                             {
                                 ProcessTermination = true;
@@ -134,14 +169,11 @@ namespace load_machine
                                 ProcessTermination = true;
                                 break;
                             }
-                            // roders机床关门
                             CloseMachineDoorIfRoders(macnum);
                             if (!Updaterobotmessage(null, 1))
                                 Log("ERROR", "更新机器人手爪信息失败！");
-                            // 更新工位表（待加工状态）
                             if (!UpdateMacWorkPosStatus(macnum, workpiecename, 0))
                                 Log("ERROR", "更新机床工位表" + macnum + "工件信息失败！");
-                            // 空工位判断 + 程序上传/合并 + 启动加工
                             bool uploaded = HandleUploadProgram(macnum, ip, workpiecename);
                             if (!uploaded && GetMacEmptyPositions(macnum).Count == 0)
                             {
@@ -155,14 +187,22 @@ namespace load_machine
                         }
                     }
                 }
-                else if (waitmaclist.Count > 0 && !(followpiecelist.Count > 0))
+                else
                 {
-                    string workpiecename = GetRobotMessagePieceMessage();
-                    if (workpiecename != null)
+                    // ===== 无随行台：机器人夹爪已有工件 → 直接放机床 =====
+                    int macnum = Convert.ToInt16(waitmaclist[0].Split(',')[0]);
+                    string ip = waitmaclist[0].Split(',')[1];
+
+                    // 机床上已有工件 → 退出
+                    if (MachineHasPiece(macnum))
                     {
-                        int macnum = Convert.ToInt16(waitmaclist[0].Split(',')[0]);
-                        string ip = waitmaclist[0].Split(',')[1];
-                        // roders机床先开门
+                        Log("INFO", "机床" + macnum + " 已有工件，退出上机流程");
+                        return;
+                    }
+
+                    // 机床上无工件 且 机器人有工件 → 执行上机
+                    if (!MachineHasPiece(macnum) && !string.IsNullOrEmpty(robotPieceName))
+                    {
                         if (!OpenMachineDoorIfRoders(macnum))
                         {
                             ProcessTermination = true;
@@ -175,24 +215,21 @@ namespace load_machine
                             return;
                         }
                         Log("INFO", "机器人执行放置工件到" + macnum + "任务成功！");
-                        // roders机床关门
                         CloseMachineDoorIfRoders(macnum);
                         if (!Updaterobotmessage(null, 1))
                             Log("ERROR", "更新机器人手爪信息失败！");
-                        // 更新工位表（待加工状态）
-                        if (!UpdateMacWorkPosStatus(macnum, workpiecename, 0))
+                        if (!UpdateMacWorkPosStatus(macnum, robotPieceName, 0))
                             Log("ERROR", "更新机床工位表" + macnum + "工件信息失败！");
-                        // 空工位判断 + 程序上传/合并 + 启动加工
-                        bool uploaded = HandleUploadProgram(macnum, ip, workpiecename);
+                        bool uploaded = HandleUploadProgram(macnum, ip, robotPieceName);
                         if (!uploaded && GetMacEmptyPositions(macnum).Count == 0)
                         {
                             Log("INFO", "机床" + macnum + "无空工位，跳过上机流程！");
                             return;
                         }
-                        if (uploaded && !UpdateMacWorkPosStatus(macnum, workpiecename, 1))
+                        if (uploaded && !UpdateMacWorkPosStatus(macnum, robotPieceName, 1))
                             Log("ERROR", "更新机床工位" + macnum + "工件状态失败！");
-                        if (!Updaterack_administrate(workpiecename, 1))
-                            Log("ERROR", "更新料架" + workpiecename + "工件加工状态失败！");
+                        if (!Updaterack_administrate(robotPieceName, 1))
+                            Log("ERROR", "更新料架" + robotPieceName + "工件加工状态失败！");
                     }
                 }
                 Log("INFO", "【" + DisplayName + "】分包结束");
@@ -814,6 +851,40 @@ namespace load_machine
         }
 
         /// <summary>
+        /// 判断系统是否配置了随行台
+        /// </summary>
+        static bool HasShuttle()
+        {
+            try
+            {
+                if (File.Exists(ConfigPath))
+                {
+                    var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
+                    var line = GetDict(cfg, "line");
+                    string val = GetStr(line, "shuttleExists", "");
+                    return !string.IsNullOrEmpty(val);
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>
+        /// 判断机床上是否已有工件（加工完成等待换料）
+        /// </summary>
+        static bool MachineHasPiece(int macnum)
+        {
+            try
+            {
+                CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
+                string str = "select COUNT(*) from macmessage where id=" + macnum + " and workpiecename IS NOT NULL and workpiecename != ''";
+                object val = Db.GetValue(str);
+                return val != null && Convert.ToInt32(val) > 0;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
         /// 更新机器人手爪上的工件信息和料位状态
         /// </summary>
         /// <param name="workpiecename">工件名称</param>
@@ -1168,42 +1239,6 @@ ON DUPLICATE KEY UPDATE {updateSet}";
             {
                 Log("WARN", "机床" + macId + " 关门失败，但不影响流程继续");
             }
-            return true;
-        }
-
-        /// <summary>
-        /// 初始化机床1：开门 → 发送652任务号（含任务开始信号）→ 等待完成 → 关门
-        /// </summary>
-        static bool InitMachine1Task()
-        {
-            const int MACHINE_ID = 1;
-            const int TASK_NUMBER = 652;
-
-            Log("INFO", "【机床1初始化】开始");
-
-            // 1. 开门（roders先创建服务器→连接→确认空闲→开门）
-            if (!OpenMachineDoorIfRoders(MACHINE_ID))
-            {
-                Log("ERROR", "【机床1初始化】开门失败");
-                return false;
-            }
-            Log("INFO", "【机床1初始化】自动门已打开");
-
-            // 2. 发送任务号 + 任务开始信号，等待完成
-            if (!ExecuteTask(TASK_NUMBER))
-            {
-                Log("ERROR", "【机床1初始化】执行任务 " + TASK_NUMBER + " 失败");
-                MacCloseDoor(MACHINE_ID);
-                return false;
-            }
-
-            // 3. 关门
-            if (!MacCloseDoor(MACHINE_ID))
-            {
-                Log("WARN", "【机床1初始化】关门失败，但不影响流程");
-            }
-
-            Log("SUCCESS", "【机床1初始化】完成");
             return true;
         }
 

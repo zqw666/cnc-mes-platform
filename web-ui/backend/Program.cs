@@ -839,7 +839,10 @@ namespace MachineMonitor
                         ip = GetStr(m, "ip", ""),
                         port = GetStr(m, "port", ""),
                         stationCount = GetStr(m, "stationCount", "4"),
-                        ncPath = GetStr(m, "ncPath", "")
+                        ncPath = GetStr(m, "ncPath", ""),
+                        sessionUrl = GetStr(m, "sessionUrl", ""),
+                        username = GetStr(m, "username", ""),
+                        password = GetStr(m, "password", "")
                     });
                 }
 
@@ -1093,7 +1096,10 @@ namespace MachineMonitor
                             { "ip", GetStr(m, "ip", "") },
                             { "port", GetStr(m, "port", "") },
                             { "stationCount", GetStr(m, "stationCount", "4") },
-                            { "ncPath", GetStr(m, "ncPath", "") }
+                            { "ncPath", GetStr(m, "ncPath", "") },
+                            { "sessionUrl", GetStr(m, "sessionUrl", "") },
+                            { "username", GetStr(m, "username", "") },
+                            { "password", GetStr(m, "password", "") }
                         };
                     }
                     cfg["machines"] = machinesDict;

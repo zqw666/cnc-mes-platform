@@ -42,9 +42,6 @@
     <Reference Include="PLC">
       <HintPath>..\..\PLC\PLC\bin\Debug\PLC.dll</HintPath>
     </Reference>
-    <Reference Include="Rodersoperate">
-      <HintPath>..\..\..\mac\MacCommunicate\MacCommunicate\bin\Debug\Rodersoperate.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
@@ -57,7 +54,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Macoperate.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

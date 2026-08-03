@@ -203,15 +203,6 @@ namespace rackoperate
             }
             Log("INFO", "PLC 连接成功: " + PlcIp);
 
-            // 刀库旋转：依次旋转1~10号刀
-            for (int t = 2; t <= 10; t++)
-                RunMC1Magazine(plc, t);
-
-            // 转台回零 + 依次旋转各角度
-            TurntableReturnZero(plc);
-            foreach (int angle in AngleList)
-                RunTurntable(plc, angle);
-
             // 停止标志文件
             StopFlagFile = Path.Combine(
                 Path.GetDirectoryName(ConfigPath) ?? AppDomain.CurrentDomain.BaseDirectory,

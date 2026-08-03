@@ -239,16 +239,25 @@ function renderMachines() {
   if (section) section.style.display = machinesConfig.length === 0 ? 'none' : 'block';
   if (machinesConfig.length === 0) { container.innerHTML = ''; return; }
   container.innerHTML = machinesConfig.map(function(m, index) {
+    var isSiemens = (m.type || '').toLowerCase() === 'siemense' || (m.type || '').toLowerCase() === 'siemens';
+    var siemensFields = '';
+    if (isSiemens) {
+      siemensFields =
+        '<div class="config-field siemens-field"><label>会话URL</label><input type="text" class="config-input" value="' + (m.sessionUrl || '') + '" placeholder="如: opc.tcp://192.168.1.1:4840" onchange="updateMachine(' + index + ', \'sessionUrl\', this.value)"></div>' +
+        '<div class="config-field siemens-field"><label>登录用户名</label><input type="text" class="config-input" value="' + (m.username || '') + '" placeholder="OPC UA 用户名" onchange="updateMachine(' + index + ', \'username\', this.value)"></div>' +
+        '<div class="config-field siemens-field"><label>登录密码</label><input type="password" class="config-input" value="' + (m.password || '') + '" placeholder="OPC UA 密码" onchange="updateMachine(' + index + ', \'password\', this.value)"></div>';
+    }
     return '<div class="card-item" data-machine-id="' + m.id + '">' +
       '<div class="card-header"><span class="card-title">' + (m.name || m.type + '-' + m.number) + '</span>' +
       '<button class="btn-remove" onclick="removeMachine(' + index + ')" title="删除">×</button></div>' +
       '<div class="card-body">' +
       '<div class="config-field"><label>机床编号</label><input type="text" class="config-input" value="' + (m.number || '') + '" placeholder="如: 1" onchange="updateMachine(' + index + ', \'number\', this.value)"></div>' +
-      '<div class="config-field"><label>品牌</label><input type="text" class="config-input mc-type" value="' + (m.type || '') + '" placeholder="如: fanuc" onchange="updateMachine(' + index + ', \'type\', this.value)"></div>' +
+      '<div class="config-field"><label>品牌</label><input type="text" class="config-input mc-type" value="' + (m.type || '') + '" placeholder="如: fanuc" onchange="updateMachine(' + index + ', \'type\', this.value);renderMachines()"></div>' +
       '<div class="config-field"><label>IP</label><input type="text" class="config-input mc-ip" value="' + (m.ip || '') + '" placeholder="IP" onchange="updateMachine(' + index + ', \'ip\', this.value)"></div>' +
       '<div class="config-field"><label>端口</label><input type="text" class="config-input" value="' + (m.port || '') + '" placeholder="如: 8193" onchange="updateMachine(' + index + ', \'port\', this.value)"></div>' +
       '<div class="config-field"><label>工位数</label><input type="number" class="config-input" value="' + (m.stationCount || 4) + '" min="1" onchange="updateMachine(' + index + ', \'stationCount\', parseInt(this.value))"></div>' +
       '<div class="config-field"><label>NC路径</label><input type="text" class="config-input mc-nc" value="' + (m.ncPath || '') + '" placeholder="NC路径" onchange="updateMachine(' + index + ', \'ncPath\', this.value)"></div>' +
+      siemensFields +
       '</div></div>';
   }).join('');
 }

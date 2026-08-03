@@ -56,6 +56,7 @@ namespace unload_machine
         static string PlcIp = "192.168.1.1";
         static int PlcPort = 9600;
         static int PlcDm = 100;
+        static string TaskStartAddr = "";
         static string TaskFinishAddr = "205.00";
         static string RobotEleAddr = "206.00";
 
@@ -95,12 +96,21 @@ namespace unload_machine
                         if (plc.ContainsKey("ip")) PlcIp = plc["ip"].ToString();
                         if (plc.ContainsKey("port")) PlcPort = Convert.ToInt32(plc["port"]);
 
-                        if (plc.ContainsKey("addresses"))
-                        {
-                            var addrs = GetDict(plc, "addresses");
-                            if (addrs.ContainsKey("task_finish")) TaskFinishAddr = addrs["task_finish"].ToString();
-                            if (addrs.ContainsKey("robot_ele")) RobotEleAddr = addrs["robot_ele"].ToString();
-                                                    }
+                        // 优先从 signals.robot 读取
+                        var signals = GetDict(plc, "signals");
+                        var robotSig = GetDict(signals, "robot");
+                        if (robotSig.ContainsKey("taskStart"))
+                            TaskStartAddr = GetStr(robotSig, "taskStart", "");
+                        if (robotSig.ContainsKey("taskDone"))
+                            TaskFinishAddr = GetStr(robotSig, "taskDone", TaskFinishAddr);
+
+                        // 兜底：旧格式 addresses
+                        var addrs = GetDict(plc, "addresses");
+                        if (string.IsNullOrEmpty(TaskStartAddr) && addrs.ContainsKey("task_start"))
+                            TaskStartAddr = addrs["task_start"].ToString();
+                        if (string.IsNullOrEmpty(TaskFinishAddr) && addrs.ContainsKey("task_finish"))
+                            TaskFinishAddr = addrs["task_finish"].ToString();
+                        if (addrs.ContainsKey("robot_ele")) RobotEleAddr = addrs["robot_ele"].ToString();
 
                         if (plc.ContainsKey("dm")) { var dm = GetDict(plc, "dm"); if (dm.ContainsKey("task_number")) PlcDm = Convert.ToInt32(dm["task_number"]); }
                     }
@@ -146,6 +156,33 @@ namespace unload_machine
             {
                 LoadConfig();
                 InitMachines();
+                // OPC UA 连接测试
+                foreach (var kv in MacList)
+                {
+                    var m = MachineConfigs.ContainsKey(kv.Key) ? MachineConfigs[kv.Key] : null;
+                    string typeStr = m != null && m.ContainsKey("type") ? m["type"] : "";
+                    if (typeStr == "siemense")
+                    {
+                        Log("INFO", string.Format("机床 {0} (siemense) 正在测试 OPC UA 连接 {1}:4840 (等待最多 10 秒)...", kv.Key, m["ip"]));
+                        try
+                        {
+                            var task = Task.Run(() => kv.Value.ConnectMac());
+                            if (task.Wait(TimeSpan.FromSeconds(10)))
+                            {
+                                if (task.Result) Log("SUCCESS", string.Format("机床 {0} OPC UA 连接成功！", kv.Key));
+                                else Log("ERROR", string.Format("机床 {0} OPC UA 连接失败", kv.Key));
+                            }
+                            else
+                            {
+                                Log("ERROR", string.Format("机床 {0} OPC UA 连接超时（10 秒）", kv.Key));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log("ERROR", string.Format("机床 {0} OPC UA 连接异常: {1}", kv.Key, ex.Message));
+                        }
+                    }
+                }
                 Mysql = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
                 Plc = new plc();
                 if (!Plc.Connect(PlcIp, PlcPort))
@@ -222,13 +259,13 @@ namespace unload_machine
             if(cp==0){Log("INFO","手上无夹爪");return PickTargetGripper();}
             if(IsT(ct)){Log("INFO","已为目标夹爪:"+cn);return true;}
             Log("INFO","清空当前夹爪("+cn+")...");
-            if(!string.IsNullOrEmpty(cw)&&cw!="NULL"){int s=GetEmptyRackSlot();if(s==0){Log("ERROR","无料架空位");return false;}Plc.WriteDM(PlcDm,s);if(!WaitTask(300))return false;try{Mysql.ExecuteSql("UPDATE rack_administrate SET rfid='"+cw+"',scanstatus=1,posstatus=2 WHERE id="+s);}catch{}ClearRobotWp();}
+            if(!string.IsNullOrEmpty(cw)&&cw!="NULL"){int s=GetEmptyRackSlot();if(s==0){Log("ERROR","无料架空位");return false;}Plc.WriteDM(PlcDm,s);if(!WaitForTaskFinish(3000))return false;try{Mysql.ExecuteSql("UPDATE rack_administrate SET rfid='"+cw+"',scanstatus=1,posstatus=2 WHERE id="+s);}catch{}ClearRobotWp();}
             if(!ClearCurGrp(ct))return false;
             return PickTargetGripper();
         }
         static bool PickTargetGripper(){return PickGrp(TargetGripperType);}
-        static bool ClearCurGrp(string t){var g=FG(t);if(g==null)return true;if(!string.IsNullOrEmpty(g.SlotPhotoSignal)&&Plc.ReadWR(g.SlotPhotoSignal)){Log("ERROR","夹爪料位有异物");return false;}if(!string.IsNullOrEmpty(g.PlaceTaskNo)){int tn=ParseTaskNo(g.PlaceTaskNo)+(string.IsNullOrEmpty(g.Number)?0:int.Parse(g.Number));Plc.WriteDM(PlcDm,tn);if(!WaitTask(300))return false;}ClearRobotClamp();return true;}
-        static bool PickGrp(string t){var g=FG(t);if(g==null){Log("ERROR","未找到目标夹爪");return false;}if(!string.IsNullOrEmpty(g.GrabTaskNo)){int tn=ParseTaskNo(g.GrabTaskNo)+(string.IsNullOrEmpty(g.Number)?0:int.Parse(g.Number));Plc.WriteDM(PlcDm,tn);if(!WaitTask(300))return false;}try{Mysql.ExecuteSql("UPDATE robotmessage SET clampname='"+g.Name+"',clampstatus="+(t=="steel"?1:t=="tool"?2:t=="electrode"?3:4)+",clampposstatus=1,workpiecename=NULL,workpiecestatus=0");}catch{}Log("SUCCESS","已抓取:"+g.Name);return true;}
+        static bool ClearCurGrp(string t){var g=FG(t);if(g==null)return true;if(!string.IsNullOrEmpty(g.SlotPhotoSignal)&&Plc.ReadWR(g.SlotPhotoSignal)){Log("ERROR","夹爪料位有异物");return false;}if(!string.IsNullOrEmpty(g.PlaceTaskNo)){int tn=ParseTaskNo(g.PlaceTaskNo)+(string.IsNullOrEmpty(g.Number)?0:int.Parse(g.Number));Plc.WriteDM(PlcDm,tn);if(!WaitForTaskFinish(3000))return false;}ClearRobotClamp();return true;}
+        static bool PickGrp(string t){var g=FG(t);if(g==null){Log("ERROR","未找到目标夹爪");return false;}if(!string.IsNullOrEmpty(g.GrabTaskNo)){int tn=ParseTaskNo(g.GrabTaskNo)+(string.IsNullOrEmpty(g.Number)?0:int.Parse(g.Number));Plc.WriteDM(PlcDm,tn);if(!WaitForTaskFinish(3000))return false;}try{Mysql.ExecuteSql("UPDATE robotmessage SET clampname='"+g.Name+"',clampstatus="+(t=="steel"?1:t=="tool"?2:t=="electrode"?3:4)+",clampposstatus=1,workpiecename=NULL,workpiecestatus=0");}catch{}Log("SUCCESS","已抓取:"+g.Name);return true;}
         static bool IsT(string t)=>string.Equals(t,TargetGripperType,StringComparison.OrdinalIgnoreCase)||(t=="1"&&TargetGripperType=="steel")||(t=="2"&&TargetGripperType=="tool")||(t=="3"&&TargetGripperType=="electrode")||(t=="4"&&TargetGripperType=="pallet");
         static GripperConfig FG(string t){foreach(var g in Grippers)if(string.Equals(g.Type,t,StringComparison.OrdinalIgnoreCase)||(t=="1"&&g.Type=="steel")||(t=="2"&&g.Type=="tool")||(t=="3"&&g.Type=="electrode")||(t=="4"&&g.Type=="pallet"))return g;return Grippers.Count>0?Grippers[0]:null;}
 
@@ -333,30 +370,57 @@ namespace unload_machine
         /// <returns></returns>
         public static bool ExecuteTask(int tasknum)
         {
-            bool flag = true;
+            // 1. 先复位任务开始信号
+            if (!string.IsNullOrEmpty(TaskStartAddr))
+            {
+                Plc.WriteWR(TaskStartAddr, 0);
+                Log("INFO", "复位任务开始信号: " + TaskStartAddr);
+            }
+
+            // 2. 写入任务号
             if (!Plc.WriteDM(PlcDm, tasknum))
             {
-                Log("ERROR", "发送任务失败，料位: " + tasknum);
-                flag = false;
+                Log("ERROR", "发送任务号失败: " + tasknum);
+                return false;
             }
+            Log("INFO", "写入任务号 " + tasknum + " 至 DM" + PlcDm);
 
-            Log("INFO", "发送任务 " + tasknum + " 成功");
-
-            // 等待任务完成
-            int waitCount = 0;
-            while (!Plc.ReadWR(TaskFinishAddr) && waitCount < 300)
+            // 3. 发送任务开始信号
+            if (!string.IsNullOrEmpty(TaskStartAddr))
             {
-                Thread.Sleep(100);
-                waitCount++;
+                if (!Plc.WriteWR(TaskStartAddr, 1))
+                {
+                    Log("ERROR", "发送任务开始信号失败: " + TaskStartAddr);
+                    return false;
+                }
+                Log("INFO", "发送任务开始信号: " + TaskStartAddr);
+            }
+            else
+            {
+                Log("WARN", "未配置任务开始信号，跳过");
             }
 
-            if (!Plc.ReadWR(TaskFinishAddr))
+            // 4. 等待任务完成信号
+            if (!string.IsNullOrEmpty(TaskFinishAddr))
             {
-                Log("WARN", "等待任务完成超时，任务: " + tasknum);
-                flag = false;
+                Log("INFO", "等待任务完成信号 " + TaskFinishAddr + " = 1...");
+                int waitCount = 0;
+                while (!Plc.ReadWR(TaskFinishAddr) && waitCount < 3000)
+                {
+                    Thread.Sleep(100);
+                    waitCount++;
+                }
+
+                if (!Plc.ReadWR(TaskFinishAddr))
+                {
+                    Log("ERROR", "等待任务完成超时，任务: " + tasknum);
+                    return false;
+                }
+                Log("INFO", "任务完成信号已收到: " + TaskFinishAddr);
             }
-            Log("INFO", "执行任务 " + tasknum + " 成功");
-            return flag;
+
+            Log("SUCCESS", "执行任务 " + tasknum + " 完成");
+            return true;
         }
 
         /// <summary>
@@ -543,11 +607,11 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                 if (!File.Exists(ConfigPath)) { Log("WARN", "配置文件不存在: " + ConfigPath); return; }
                 var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
                 if (!cfg.ContainsKey("machines")) { Log("WARN", "配置文件中没有 machines 节点"); return; }
-                var machines = Js.Deserialize<Dictionary<string, object>>(cfg["machines"].ToString());
+                var machines = cfg["machines"] as Dictionary<string, object> ?? new Dictionary<string, object>();
                 foreach (var kv in machines)
                 {
                     int macId = Convert.ToInt32(kv.Key);
-                    var m = Js.Deserialize<Dictionary<string, object>>(kv.Value.ToString());
+                    var m = kv.Value as Dictionary<string, object> ?? new Dictionary<string, object>();
                     string typeStr = m.ContainsKey("type") ? m["type"].ToString().ToLower() : "roders";
                     string ip = m.ContainsKey("ip") ? m["ip"].ToString() : "";
                     MachineConfigs[macId] = new Dictionary<string, string>() { { "type", typeStr }, { "ip", ip } };
@@ -633,7 +697,7 @@ ON DUPLICATE KEY UPDATE {updateSet}";
 
         static string SafeStr(object v)=>v==DBNull.Value?"":v?.ToString()??"";
         static int SafeInt(object v)=>v==DBNull.Value?0:Convert.ToInt32(v);
-        static bool WaitTask(int m){int w=0;while(w<m){if(Plc.ReadWR(TaskFinishAddr))return true;Thread.Sleep(100);w++;}return Plc.ReadWR(TaskFinishAddr);}
+        static bool WaitForTaskFinish(int maxTicks){int w=0;while(w<maxTicks){if(Plc.ReadWR(TaskFinishAddr))return true;Thread.Sleep(100);w++;}return Plc.ReadWR(TaskFinishAddr);}
         static void ClearRobotWp(){try{Mysql?.ExecuteSql("UPDATE robotmessage SET workpiecename=NULL,workpiecestatus=0");}catch{}}
         static void ClearRobotClamp(){try{Mysql?.ExecuteSql("UPDATE robotmessage SET clampname=NULL,clampposstatus=0,workpiecename=NULL,workpiecestatus=0");}catch{}}
         static int GetEmptyRackSlot(){try{using(DataTable dt=Mysql.ExeForDtl("SELECT id FROM rack_administrate WHERE posstatus=1 AND scanstatus=0 LIMIT 1")){if(dt!=null&&dt.Rows.Count>0)return Convert.ToInt32(dt.Rows[0]["id"]);}}catch{}return 0;}
