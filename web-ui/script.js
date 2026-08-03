@@ -1,4 +1,4 @@
-// ==================== 全局函数（必须在 DOMContentLoaded 外，HTML onclick 可访问） ====================
+﻿// ==================== 全局函数（必须在 DOMContentLoaded 外，HTML onclick 可访问） ====================
 function toast(msg, type = 'info') {
   let el = document.getElementById('toast-box');
   if (!el) {
@@ -1175,15 +1175,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 线体配置
       const line = d.line || {};
-      document.getElementById('cfg-rack-type').value = line.rackType || '固定料架';
-      document.getElementById('cfg-rack-count').value = line.rackCount || '';
-      document.getElementById('cfg-rack-layers').value = line.rackLayers || '';
-      document.getElementById('cfg-rack-slots').value = line.rackSlots || '';
-      document.getElementById('cfg-gripper-type').value = line.gripperType || '固定单爪';
-      document.getElementById('cfg-grab-mode').value = line.grabMode || 'A抓B放';
-      document.getElementById('cfg-pallet-enabled').value = line.palletEnabled ? 'yes' : 'no';
-      document.getElementById('cfg-pallet-slots').value = line.palletSlots || '4';
-      updatePalletFields();
+      const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      setVal('cfg-rack-type', line.rackType || '固定料架');
+      setVal('cfg-rack-count', line.rackCount || '');
+      setVal('cfg-rack-layers', line.rackLayers || '');
+      setVal('cfg-rack-slots', line.rackSlots || '');
+      setVal('cfg-gripper-type', line.gripperType || '固定单爪');
+      setVal('cfg-grab-mode', line.grabMode || 'A抓B放');
+      setVal('cfg-pallet-enabled', line.palletEnabled ? 'yes' : 'no');
+      setVal('cfg-pallet-slots', line.palletSlots || '4');
+      if (typeof updatePalletFields === 'function') updatePalletFields();
 
       // 机床信息
       machinesConfig = Array.isArray(line.machines) && line.machines.length > 0 ? line.machines : (machinesConfig.length > 0 ? machinesConfig : []);
@@ -1203,21 +1204,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       const palletSignals = signals.pallet || {};
       const presetSignals = signals.preset || {};
       const cleanerSignals = signals.cleaner || {};
-      document.getElementById('cfg-plc-ip').value = plc.ip || '';
-      document.getElementById('cfg-plc-port').value = plc.port || '';
+      setVal('cfg-plc-ip', plc.ip || '');
+      setVal('cfg-plc-port', plc.port || '');
       // rack 信号
-      document.getElementById('cfg-door-open-request').value = rackSignals.openRequest || '';
-      document.getElementById('cfg-door-open-allow').value = rackSignals.openAllow || '';
-      document.getElementById('cfg-door-closed').value = rackSignals.doorClosed || '';
-      document.getElementById('cfg-photoelectric-change').value = rackSignals.photoChange || '';
-      document.getElementById('cfg-rack-busy').value = rackSignals.busy || '';
+      setVal('cfg-door-open-request', rackSignals.openRequest || '');
+      setVal('cfg-door-open-allow', rackSignals.openAllow || '');
+      setVal('cfg-door-closed', rackSignals.doorClosed || '');
+      setVal('cfg-photoelectric-change', rackSignals.photoChange || '');
+      setVal('cfg-rack-busy', rackSignals.busy || '');
       // robot 信号
-      document.getElementById('cfg-robot-photoelectric').value = robotSignals.photo || '';
-      document.getElementById('cfg-task-start-signal').value = robotSignals.taskStart || '';
-      document.getElementById('cfg-task-complete-signal').value = robotSignals.taskDone || '';
-      document.getElementById('cfg-robot-error').value = robotSignals.error || '';
-      document.getElementById('cfg-robot-safe').value = robotSignals.safePos || '';
-      document.getElementById('cfg-emergency-stop').value = robotSignals.estop || '';
+      setVal('cfg-robot-photoelectric', robotSignals.photo || '');
+      setVal('cfg-task-start-signal', robotSignals.taskStart || '');
+      setVal('cfg-task-complete-signal', robotSignals.taskDone || '');
+      setVal('cfg-robot-error', robotSignals.error || '');
+      setVal('cfg-robot-safe', robotSignals.safePos || '');
+      setVal('cfg-emergency-stop', robotSignals.estop || '');
       // pallet 信号
       var pslot  = document.getElementById('cfg-signal-pallet-slot-photo');
       var pgrab  = document.getElementById('cfg-signal-pallet-grab-task');
@@ -1228,41 +1229,41 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (pplace) pplace.value = palletSignals.placeTaskNo || '';
       if (pstart) pstart.value = palletSignals.photoStart || '';
       // preset 信号
-      document.getElementById('cfg-preset-photoelectric').value = presetSignals.photo || '';
-      document.getElementById('cfg-preset-manual-signal').value = presetSignals.manual || '';
+      setVal('cfg-preset-photoelectric', presetSignals.photo || '');
+      setVal('cfg-preset-manual-signal', presetSignals.manual || '');
       // cleaner 信号
-      document.getElementById('cfg-clean-photoelectric').value = cleanerSignals.photo || '';
-      document.getElementById('cfg-clean-door-open').value = cleanerSignals.doorOpen || '';
-      document.getElementById('cfg-clean-door-closed').value = cleanerSignals.doorClosed || '';
+      setVal('cfg-clean-photoelectric', cleanerSignals.photo || '');
+      setVal('cfg-clean-door-open', cleanerSignals.doorOpen || '');
+      setVal('cfg-clean-door-closed', cleanerSignals.doorClosed || '');
 
       // PLC DM区
       const dm = plc.dm || {};
-      document.getElementById('cfg-dm-task-number').value = dm.task_number || '';
-      document.getElementById('cfg-dm-robot-task').value = dm.robot_task || '';
-      document.getElementById('cfg-dm-rack-photoelectric').value = dm.rack_layer_photoelectric || '';
-      document.getElementById('cfg-dm-gripper-type').value = dm.gripper_type || '';
-      document.getElementById('cfg-dm-fixture-position').value = dm.fixture_position || '';
-      document.getElementById('cfg-dm-shuttle-part-count').value = dm.shuttle_part_count || '';
+      setVal('cfg-dm-task-number', dm.task_number || '');
+      setVal('cfg-dm-robot-task', dm.robot_task || '');
+      setVal('cfg-dm-rack-photoelectric', dm.rack_layer_photoelectric || '');
+      setVal('cfg-dm-gripper-type', dm.gripper_type || '');
+      setVal('cfg-dm-fixture-position', dm.fixture_position || '');
+      setVal('cfg-dm-shuttle-part-count', dm.shuttle_part_count || '');
 
       // 数据库
       const db = d.database || {};
-      document.getElementById('cfg-db-type').value = db.type || 'mysql';
-      document.getElementById('cfg-db-host').value = db.host || '';
-      document.getElementById('cfg-db-port').value = db.port || '';
-      document.getElementById('cfg-db-user').value = db.user || '';
-      document.getElementById('cfg-db-password').value = db.password || '';
-      document.getElementById('cfg-db-name').value = db.database || '';
-      document.getElementById('cfg-db-charset').value = db.charset || '';
+      setVal('cfg-db-type', db.type || 'mysql');
+      setVal('cfg-db-host', db.host || '');
+      setVal('cfg-db-port', db.port || '');
+      setVal('cfg-db-user', db.user || '');
+      setVal('cfg-db-password', db.password || '');
+      setVal('cfg-db-name', db.database || '');
+      setVal('cfg-db-charset', db.charset || '');
 
       // eman数据库
       const eman = d.emanDatabase || {};
-      document.getElementById('cfg-eman-db-type').value = eman.type || 'mysql';
-      document.getElementById('cfg-eman-db-host').value = eman.host || '';
-      document.getElementById('cfg-eman-db-port').value = eman.port || '';
-      document.getElementById('cfg-eman-db-user').value = eman.user || '';
-      document.getElementById('cfg-eman-db-password').value = eman.password || '';
-      document.getElementById('cfg-eman-db-name').value = eman.database || '';
-      document.getElementById('cfg-eman-db-charset').value = eman.charset || '';
+      setVal('cfg-eman-db-type', eman.type || 'mysql');
+      setVal('cfg-eman-db-host', eman.host || '');
+      setVal('cfg-eman-db-port', eman.port || '');
+      setVal('cfg-eman-db-user', eman.user || '');
+      setVal('cfg-eman-db-password', eman.password || '');
+      setVal('cfg-eman-db-name', eman.database || '');
+      setVal('cfg-eman-db-charset', eman.charset || '');
 
     } catch (e) {
       console.warn('配置加载失败', e);
@@ -1276,21 +1277,32 @@ function renderMachines() {
     machinesConfig.forEach((m, i) => {
       const card = document.createElement('div');
       card.className = 'machine-card';
-      card.innerHTML = `
-        <div class="config-field"><label>机床编号</label><input class="config-input mc-number" value="${escapeHtml(m.number || '')}" placeholder="如: 1" /></div>
-        <div class="config-field"><label>机床品牌</label><input class="config-input mc-type" value="${escapeHtml(m.type || '')}" placeholder="如: fanuc" /></div>
-        <div class="config-field"><label>机床IP</label><input class="config-input mc-ip" value="${escapeHtml(m.ip || '')}" placeholder="如: 192.168.1.101" /></div>
-        <div class="config-field"><label>通讯端口</label><input class="config-input mc-port" value="${escapeHtml(m.port || '')}" placeholder="如: 8193" /></div>
-        <div class="config-field"><label>工位数</label><input class="config-input mc-station" type="number" value="${m.stationCount || 4}" min="1" /></div>
-        <div class="config-field"><label>NC路径</label><input class="config-input mc-nc" value="${escapeHtml(m.ncPath || '')}" placeholder="如: C:\\NC\\Mac1" /></div>
-        <button class="btn-remove-machine" title="删除机床">✕</button>
-      `;
+      var isSiemens = (m.type || '').toLowerCase() === 'siemense' || (m.type || '').toLowerCase() === 'siemens';
+      var html = '';
+      html += '<div class="config-field"><label>机床编号</label><input class="config-input mc-number" value="' + escapeHtml(m.number || '') + '" placeholder="如: 1" /></div>';
+      html += '<div class="config-field"><label>机床品牌</label><input class="config-input mc-type" value="' + escapeHtml(m.type || '') + '" placeholder="如: fanuc" /></div>';
+      html += '<div class="config-field"><label>机床IP</label><input class="config-input mc-ip" value="' + escapeHtml(m.ip || '') + '" placeholder="如: 192.168.1.101" /></div>';
+      html += '<div class="config-field"><label>通讯端口</label><input class="config-input mc-port" value="' + escapeHtml(m.port || '') + '" placeholder="如: 8193" /></div>';
+      html += '<div class="config-field"><label>工位数</label><input class="config-input mc-station" type="number" value="' + (m.stationCount || 4) + '" min="1" /></div>';
+      html += '<div class="config-field"><label>NC路径</label><input class="config-input mc-nc" value="' + escapeHtml(m.ncPath || '') + '" placeholder="如: C:\\NC\\Mac1" /></div>';
+      if (isSiemens) {
+        html += '<div class="config-field"><label>会话URL</label><input class="config-input mc-session-url" value="' + escapeHtml(m.sessionUrl || '') + '" placeholder="如: opc.tcp://192.168.1.1:4840" /></div>';
+        html += '<div class="config-field"><label>登录用户名</label><input class="config-input mc-username" value="' + escapeHtml(m.username || '') + '" placeholder="OPC UA 用户名" /></div>';
+        html += '<div class="config-field"><label>登录密码</label><input class="config-input mc-password" type="password" value="' + escapeHtml(m.password || '') + '" placeholder="OPC UA 密码" /></div>';
+      }
+      html += '<button class="btn-remove-machine" title="删除机床">✕</button>';
+      card.innerHTML = html;
       card.querySelector('.mc-number').addEventListener('input', e => { machinesConfig[i].number = e.target.value; persistLineConfig(); });
-      card.querySelector('.mc-type').addEventListener('input', e => { machinesConfig[i].type = e.target.value; persistLineConfig(); });
+      card.querySelector('.mc-type').addEventListener('input', e => { machinesConfig[i].type = e.target.value; persistLineConfig(); renderMachines(); });
       card.querySelector('.mc-ip').addEventListener('input', e => { machinesConfig[i].ip = e.target.value; persistLineConfig(); });
       card.querySelector('.mc-port').addEventListener('input', e => { machinesConfig[i].port = e.target.value; persistLineConfig(); });
       card.querySelector('.mc-station').addEventListener('input', e => { machinesConfig[i].stationCount = parseInt(e.target.value) || 4; persistLineConfig(); });
       card.querySelector('.mc-nc').addEventListener('input', e => { machinesConfig[i].ncPath = e.target.value; persistLineConfig(); });
+      if (isSiemens) {
+        card.querySelector('.mc-session-url').addEventListener('input', e => { machinesConfig[i].sessionUrl = e.target.value; persistLineConfig(); });
+        card.querySelector('.mc-username').addEventListener('input', e => { machinesConfig[i].username = e.target.value; persistLineConfig(); });
+        card.querySelector('.mc-password').addEventListener('input', e => { machinesConfig[i].password = e.target.value; persistLineConfig(); });
+      }
       card.querySelector('.btn-remove-machine').addEventListener('click', () => {
         machinesConfig.splice(i, 1);
         persistLineConfig();
@@ -1301,7 +1313,8 @@ function renderMachines() {
   }
 
   // 添加机床
-  document.getElementById('btn-add-machine').addEventListener('click', () => {
+  const btnAddMachine = document.getElementById('btn-add-machine');
+  if (btnAddMachine) btnAddMachine.addEventListener('click', () => {
     const nextId = machinesConfig.length > 0
       ? String(Math.max(...machinesConfig.map(m => parseInt(m.id) || 0)) + 1)
       : '1';
@@ -1389,7 +1402,8 @@ function renderMachines() {
   }
 
   // 保存配置
-  document.getElementById('btn-save-config').addEventListener('click', async () => {
+  const btnSaveConfig = document.getElementById('btn-save-config');
+  if (btnSaveConfig) btnSaveConfig.addEventListener('click', async () => {
     try {
       const data = collectConfig();
       const res = await apiPost('/api/config', data);
@@ -1406,17 +1420,18 @@ function renderMachines() {
   // Excel导入
   const btnImportExcel = document.getElementById('btn-import-excel');
   const excelFileInput = document.getElementById('excel-file-input');
-  btnImportExcel.addEventListener('click', () => excelFileInput.click());
-  excelFileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const XLSX = window.XLSX || (await loadXlsxLib());
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: 'array' });
-      const sheetName = wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  if (btnImportExcel && excelFileInput) {
+    btnImportExcel.addEventListener('click', () => excelFileInput.click());
+    excelFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const XLSX = window.XLSX || (await loadXlsxLib());
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
       // 解析Excel行 -> 填充表单
       let currentCategory = '';
@@ -1511,6 +1526,7 @@ function renderMachines() {
     // 清空file input以便重复选择同一文件
     excelFileInput.value = '';
   });
+  }
 
   // 加载XLSX库（动态）
   function loadXlsxLib() {
@@ -1525,7 +1541,8 @@ function renderMachines() {
   }
 
   // 导出Excel
-  document.getElementById('btn-export-excel').addEventListener('click', async () => {
+  const btnExportExcel = document.getElementById('btn-export-excel');
+  if (btnExportExcel) btnExportExcel.addEventListener('click', async () => {
     try {
       const XLSX = window.XLSX || (await loadXlsxLib());
       const rows = [
@@ -1574,8 +1591,8 @@ function renderMachines() {
   loadConfig();
 
   // ==================== Element UI 消息挂载 ====================
-  if (window.ELEMENT) {
-    ELEMENT.use(ELEMENT.Message);
+  if (window.ELEMENT && typeof ELEMENT.Message === 'function') {
+    if (typeof ELEMENT.use === 'function') ELEMENT.use(ELEMENT.Message);
     $message = (opts) => {
       if (typeof opts === 'string') opts = { message: opts };
       ELEMENT.Message(opts);
@@ -1583,46 +1600,6 @@ function renderMachines() {
   }
 
 });
-
-// ===== 线体配置页面逻辑 =====
-async function loadLineConfig() {
-  try {
-    const res = await fetch('/api/config');
-    if (!res.ok) throw new Error('加载失败');
-    const data = await res.json();
-    
-    // 填充线体配置字段
-    if (data.line) {
-      const nameInput = document.getElementById('cfg-line-name');
-      const typeSelect = document.getElementById('cfg-line-type');
-      if (nameInput) nameInput.value = data.line.name || '';
-      if (typeSelect) typeSelect.value = data.line.type || 'auto';
-    }
-    
-    // 填充PLC信号配置字段
-    if (data.plc) {
-      const ipInput = document.getElementById('cfg-plc-ip');
-      const portInput = document.getElementById('cfg-plc-port');
-      if (ipInput) ipInput.value = data.plc.ip || '';
-      if (portInput) portInput.value = data.plc.port || '';
-    }
-    
-    // 填充数据库配置字段
-    if (data.database) {
-      const typeSelect = document.getElementById('cfg-db-type');
-      const connInput = document.getElementById('cfg-db-conn');
-      if (typeSelect) typeSelect.value = data.database.type || 'mysql';
-      if (connInput) connInput.value = data.database.connectionString || '';
-    }
-    
-    console.log('线体配置加载成功');
-  } catch (err) {
-    console.error('加载线体配置失败:', err);
-    // 不弹窗，避免影响用户体验
-  }
-}
-
-
 
 // 收集配置数据
 function collectLineConfig() {
@@ -1742,7 +1719,10 @@ async function loadLineConfig() {
     if (rackSlotsEl) rackSlotsEl.value = line.rackSlots || 6;
     if (gripperTypeEl) { gripperTypeEl.value = line.gripperType || 'fixed-single'; onGripperTypeChange(); }
     if (grabModeEl) grabModeEl.value = line.grabMode || 'A-grab-B-place';
-    if (palletEnabledEl) { palletEnabledEl.value = line.palletEnabled ? 'yes' : 'no'; updatePalletFields(); }
+    if (palletEnabledEl) {
+      palletEnabledEl.value = line.palletEnabled ? 'yes' : 'no';
+      if (typeof updatePalletFields === 'function') updatePalletFields();
+    }
     if (palletSlotsEl) palletSlotsEl.value = line.palletSlots || 4;
     
     // 料架和机床
@@ -2082,8 +2062,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updatePalletFields();
   }
   
-  // 初始化：从 localStorage 恢复配置并渲染
+  // 初始化：先恢复本地缓存，再从后端加载配置（后端为准，保证 config.json 的机床可见）
   restoreLineConfig();
-  renderRacks();
-  renderMachines();
+  loadLineConfig();
 });
