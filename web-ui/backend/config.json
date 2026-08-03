@@ -1,0 +1,134 @@
+﻿{
+    "line":  {
+                 "rackType":  "fixed",
+                 "rackCount":  "1",
+                 "rackLayers":  "3",
+                 "rackSlots":  "6",
+                 "gripperType":  "quick-electrode",
+                 "grabMode":  "A-grab-B-place",
+                 "shuttleExists":  "",
+                 "shuttleSlots":  ""
+             },
+    "plc":  {
+                "ip":  "192.168.125.100",
+                "port":  "9600",
+                "signals":  {
+                                "robot":  {
+                                              "photo":  "",
+                                              "taskStart":  "104.00",
+                                              "taskDone":  "100.02",
+                                              "taskNumber":  "100",
+                                              "error":  "100.01",
+                                              "safePos":  "",
+                                              "estop":  "103.01"
+                                          },
+                                "pallet":  {
+                                               "slotPhoto":  ""
+                                           },
+                                "preset":  {
+                                               "photo":  "",
+                                               "manual":  ""
+                                           },
+                                "cleaner":  {
+                                                "photo":  "",
+                                                "doorOpen":  "",
+                                                "doorClosed":  ""
+                                            }
+                            },
+                "dm":  {
+                           "task_number":  "",
+                           "robot_task":  "",
+                           "rack_layer_photoelectric":  "",
+                           "gripper_type":  "",
+                           "fixture_position":  "",
+                           "shuttle_part_count":  ""
+                       }
+            },
+    "machines":  {
+                     "1":  {
+                               "type":  "siemense",
+                               "number":  "1",
+                               "ip":  "192.168.101.53",
+                               "port":  "4840",
+                               "stationCount":  "1",
+                               "ncPath":  "C:\\NC\\Mac1"
+                           },
+                     "2":  {
+                               "type":  "roders",
+                               "number":  "2",
+                               "ip":  "192.168.1.102",
+                               "port":  "20200",
+                               "stationCount":  "1",
+                               "ncPath":  "C:\\NC\\Mac2"
+                           },
+                     "3":  {
+                               "type":  "roders",
+                               "number":  "3",
+                               "ip":  "192.168.1.103",
+                               "port":  "20200",
+                               "stationCount":  "1",
+                               "ncPath":  "C:\\NC\\Mac3"
+                           }
+                 },
+    "racks":  [
+                  {
+                      "id":  "rack_1",
+                      "type":  "steel",
+                      "name":  "钢件料架1",
+                      "number":  "1",
+                      "rows":  "6",
+                      "cols":  "6",
+                      "photoSignal":  "DM100",
+                      "openRequest":  "103.02",
+                      "openSignal":  "107.05",
+                      "doorClosed":  "103.00",
+                      "doorFlag":  "103.05",
+                      "grabStartTaskNo":  "D200",
+                      "placeStartTaskNo":  "D300",
+                      "scanStartTaskNo":  "D400"
+                  }
+              ],
+    "eman":  {
+                 "port":  1433,
+                 "host":  "172.16.128.243",
+                 "password":  "19830617",
+                 "type":  "sqlserver",
+                 "user":  "sa",
+                 "database":  "eman"
+             },
+    "nc_server":  {
+                      "process_card_nc_line":  3,
+                      "local_temp":  "D:\\nc_temp",
+                      "root_path":  "\\\\192.168.1.100\\share",
+                      "process_card_nc_cell":  "A1"
+                  },
+    "grippers":  [
+                     {
+                         "id":  "1783924771668",
+                         "type":  "steel",
+                         "name":  "钢件夹爪1",
+                         "number":  "1",
+                         "slotPhotoSignal":  "105.02",
+                         "grabTaskNo":  "201",
+                         "placeTaskNo":  "202"
+                     },
+                     {
+                         "id":  "1783924836163",
+                         "type":  "tool",
+                         "name":  "刀具夹爪1",
+                         "number":  "1",
+                         "slotPhotoSignal":  "105.03",
+                         "grabTaskNo":  "203",
+                         "placeTaskNo":  "204"
+                     }
+                 ],
+    "database":  {
+                     "type":  "mysql",
+                     "host":  "localhost",
+                     "port":  3306,
+                     "database":  "qianduantest",
+                     "user":  "root",
+                     "password":  "123456"
+                 },
+    "serverIp":  "192.168.125.201"
+}

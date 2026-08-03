@@ -1066,6 +1066,9 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                     string typeStr = m.ContainsKey("type") ? m["type"].ToString().ToLower() : "roders";
                     string ip = m.ContainsKey("ip") ? m["ip"].ToString() : "";
                     string ncPath = m.ContainsKey("ncPath") ? m["ncPath"].ToString() : "";
+                    string sessionUrl = m.ContainsKey("sessionUrl") ? m["sessionUrl"].ToString() : "";
+                    string username = m.ContainsKey("username") ? m["username"].ToString() : "";
+                    string password = m.ContainsKey("password") ? m["password"].ToString() : "";
                     MachineConfigs[macId] = new Dictionary<string, string>() { { "type", typeStr }, { "ip", ip }, { "ncPath", ncPath } };
 
                     MacCommunicate.Macfactory.MacType macType;
@@ -1076,11 +1079,11 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                         case "makino": macType = MacCommunicate.Macfactory.MacType.makino; break;
                         default: macType = MacCommunicate.Macfactory.MacType.roders; break;
                     }
-                    var mac = MacCommunicate.Macfactory.MacFactory.CreateInstance(macType, ip);
+                    var mac = MacCommunicate.Macfactory.MacFactory.CreateInstance(macType, ip, sessionUrl, username, password);
                     if (mac != null)
                     {
                         MacList[macId] = mac;
-                        Log("INFO", $"机床 {macId} ({typeStr}) 已创建实例，IP: {ip}");
+                        Log("INFO", $"机床 {macId} ({typeStr}) 已创建实例，IP: {ip}" + (string.IsNullOrEmpty(sessionUrl) ? "" : $"，会话: {sessionUrl}"));
                     }
                     else
                     {

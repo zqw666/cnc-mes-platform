@@ -159,7 +159,10 @@ function addMachine(data = {}) {
     ip: data.ip || '',
     port: data.port || '',
     stationCount: data.stationCount || 4,
-    ncpath: data.ncpath || ''
+    ncPath: data.ncPath || '',
+    sessionUrl: data.sessionUrl || '',
+    username: data.username || '',
+    password: data.password || ''
   };
   machinesConfig.push(machine);
   persistLineConfig();

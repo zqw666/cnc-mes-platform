@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Configuration;
 
 namespace MacCommunicate
 {
@@ -11,13 +10,18 @@ namespace MacCommunicate
     {
         private string _macip;
         Siemensoperate operate =null;
-        string userid = ConfigurationManager.AppSettings[""];
-        string pwd = ConfigurationManager.AppSettings[""];
-        string winscpkey = ConfigurationManager.AppSettings[""];
+        private readonly string _sessionUrl;
+        private readonly string _username;
+        private readonly string _password;
+        private readonly string _winscpKey;
 
-        public Siemence(string macip)
+        public Siemence(string macip, string sessionUrl = null, string username = null, string password = null, string winscpKey = null)
         {
             _macip = macip;
+            _sessionUrl = sessionUrl;
+            _username = username;
+            _password = password;
+            _winscpKey = winscpKey;
         }
         /// <summary>
         /// 连接机床
@@ -26,7 +30,7 @@ namespace MacCommunicate
         public bool ConnectMac()
         {
             bool flag = false;
-            operate = new Siemensoperate(_macip, userid,pwd,winscpkey);
+            operate = new Siemensoperate(_macip, _username, _password, _winscpKey, _sessionUrl);
             if (operate.Connect())
                 flag = true;
             return flag;
@@ -39,6 +43,8 @@ namespace MacCommunicate
         public string GetMacStatus()
         {
             string status = null;
+            if (operate == null)
+                return "未连接";
             Siemensoperate.MachineStatus macstatus = operate.Status;
             int Status = macstatus.Stus;
             switch(Status)

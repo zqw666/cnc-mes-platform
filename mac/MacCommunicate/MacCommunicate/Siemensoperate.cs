@@ -100,6 +100,21 @@ namespace MacCommunicate
         public string WinScp_HostKey { get; }
 
         /// <summary>
+        /// OPC UA 会话地址；为空时回退为 opc.tcp://IP:4840
+        /// </summary>
+        public string SessionUrl { get; }
+
+        /// <summary>
+        /// 机床 SFTP 登录用户名（默认 user，与西门子出厂默认一致）
+        /// </summary>
+        public string SftpUserName { get; } = "user";
+
+        /// <summary>
+        /// 机床 SFTP 登录密码（默认 CUSTOMER，与西门子出厂默认一致）
+        /// </summary>
+        public string SftpPassword { get; } = "CUSTOMER";
+
+        /// <summary>
         /// 获取当前机床连接状态
         /// </summary>
         public bool Connected { get; private set; } = false;
@@ -283,12 +298,29 @@ namespace MacCommunicate
         /// <param name="UserName">连接机床的登录用户名</param>
         /// <param name="PassWord">连接机床的登录用户密码</param>
         /// <param name="WinScpHostKey">连接机床的WinScp密钥</param>
-        public Siemensoperate(string IP, string UserName, string PassWord, string WinScpHostKey)
+        /// <param name="SessionUrl">OPC UA 会话地址，为空时回退 opc.tcp://IP:4840</param>
+        /// <param name="SftpUserName">机床 SFTP 用户名，默认 user</param>
+        /// <param name="SftpPassword">机床 SFTP 密码，默认 CUSTOMER</param>
+        public Siemensoperate(string IP, string UserName, string PassWord, string WinScpHostKey,
+            string SessionUrl = null, string SftpUserName = "user", string SftpPassword = "CUSTOMER")
         {
             Michine_IP = IP;//设置连接机床的IP
             Michine_UserName = UserName;//设置连接机床的登录用户名
             Michine_PassWord = PassWord;//设置连接机床的登录用户密码
             WinScp_HostKey = WinScpHostKey;//连接机床的WinScp密钥
+            this.SessionUrl = string.IsNullOrWhiteSpace(SessionUrl) ? null : SessionUrl.Trim();
+            if (!string.IsNullOrWhiteSpace(SftpUserName)) this.SftpUserName = SftpUserName.Trim();
+            this.SftpPassword = SftpPassword ?? this.SftpPassword;
+        }
+
+        /// <summary>
+        /// 获取 OPC UA 会话地址；优先使用配置的 SessionUrl，否则回退 opc.tcp://IP:4840
+        /// </summary>
+        private string GetOpcUrl()
+        {
+            return string.IsNullOrWhiteSpace(SessionUrl)
+                ? "opc.tcp://" + Michine_IP + ":4840"
+                : SessionUrl;
         }
 
         /// <summary>
@@ -318,7 +350,7 @@ namespace MacCommunicate
                 Server.subscriptionInfo -= new Server.SubscriptionInfo(m_Server_subscriptionInfo);
                 Server.CertificateEvent += new certificateValidation(m_Server_CertificateEvent);
                 Server.subscriptionInfo += new Server.SubscriptionInfo(m_Server_subscriptionInfo);
-                string url = "opc.tcp://" + Michine_IP + ":4840";
+                string url = GetOpcUrl();
                 Server.Connect(url, Michine_UserName, Michine_PassWord);
 
                 NodeIdCollection nodesToRead = new NodeIdCollection();
@@ -339,8 +371,8 @@ namespace MacCommunicate
                             {
                                 Protocol = Protocol.Scp,
                                 HostName = Michine_IP,
-                                UserName = "user",
-                                Password = "CUSTOMER",
+                                UserName = SftpUserName,
+                                Password = SftpPassword,
                                 SshHostKeyFingerprint = WinScp_HostKey,
                             };
                             Session.Open(sess);//该函数连接的时间较长
@@ -387,7 +419,7 @@ namespace MacCommunicate
                 Server.subscriptionInfo -= new Server.SubscriptionInfo(m_Server_subscriptionInfo);
                 Server.CertificateEvent += new certificateValidation(m_Server_CertificateEvent);
                 Server.subscriptionInfo += new Server.SubscriptionInfo(m_Server_subscriptionInfo);
-                string url = "opc.tcp://" + Michine_IP + ":4840";
+                string url = GetOpcUrl();
                 Server.Connect(url, Michine_UserName, Michine_PassWord);
                 NodeIdCollection nodes = new NodeIdCollection();
                 nodes.Add(new NodeId(Command, m_NameSpaceIndex));
@@ -453,8 +485,8 @@ namespace MacCommunicate
                         {
                             Protocol = Protocol.Scp,
                             HostName = Michine_IP,
-                            UserName = "user",
-                            Password = "CUSTOMER",
+                            UserName = SftpUserName,
+                            Password = SftpPassword,
                             SshHostKeyFingerprint = WinScp_HostKey,
                         };
                         Session.Open(sess);//重新连接
