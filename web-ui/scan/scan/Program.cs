@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // 扫描流程 - SubProcess
 // 1. 置换夹爪流程
 //    - 判定机器人是固定爪还是快换爪
@@ -84,7 +84,7 @@ namespace scan
         static int RcdHeartbeatInterval = 60;
 
         // 数据库
-        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharSet=utf8;";
+        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
         static string DbType = "mysql";
         static CommonInterface Mysql;
 
@@ -217,7 +217,7 @@ namespace scan
                         else
                         {
                             int dbport = GetInt(db, "port", 3306);
-                            ConnStr = $"Server={host};Port={dbport};Database={dbname};Uid={user};Pwd={pwd};CharSet=utf8;";
+                            ConnStr = $"Server={host};Port={dbport};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
                         }
                     }
 

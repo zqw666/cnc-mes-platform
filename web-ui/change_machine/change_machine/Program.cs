@@ -37,7 +37,7 @@ namespace change_machine
         static readonly string DisplayName = "换料程序";
 
         // 数据库
-        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharSet=utf8;";
+        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
         static string DbType = "mysql";
         static CommonInterface Mysql;
         static Dictionary<int, macinterface> MacList = new Dictionary<int, macinterface>();
@@ -80,7 +80,7 @@ namespace change_machine
                         }
                         else
                         {
-                            ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharSet=utf8;";
+                            ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
                         }
                     }
 
@@ -898,7 +898,7 @@ namespace change_machine
             try
             {
                 string workpieceStr = string.IsNullOrEmpty(workpiecename) ? "NULL" : "'" + workpiecename + "'";
-                string str = "update robotmessage set workpiecename=" + workpieceStr + ",workpieceworkstate=" + workstate + ",workpiecestatus=" + workpiecestatus + " where id=1";
+                string str = "update robotmessage set workpiecename=" + workpieceStr + ",workpiecestatus=" + workpiecestatus + " where id=1";
                 if (Mysql.ExecuteSql(str))
                     flag = true;
             }
@@ -1041,11 +1041,21 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                 if (!File.Exists(ConfigPath)) { Log("WARN", "配置文件不存在: " + ConfigPath); return; }
                 var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
                 if (!cfg.ContainsKey("machines")) { Log("WARN", "配置文件中没有 machines 节点"); return; }
-                var machines = Js.Deserialize<Dictionary<string, object>>(cfg["machines"].ToString());
+                var machinesRaw = cfg["machines"];
+                Dictionary<string, object> machines;
+                if (machinesRaw is Dictionary<string, object> machinesDict)
+                    machines = machinesDict;
+                else
+                    machines = Js.Deserialize<Dictionary<string, object>>(machinesRaw.ToString());
                 foreach (var kv in machines)
                 {
                     int macId = Convert.ToInt32(kv.Key);
-                    var m = Js.Deserialize<Dictionary<string, object>>(kv.Value.ToString());
+                    var mVal = kv.Value;
+                    Dictionary<string, object> m;
+                    if (mVal is Dictionary<string, object> macDict)
+                        m = macDict;
+                    else
+                        m = Js.Deserialize<Dictionary<string, object>>(mVal.ToString());
                     string typeStr = m.ContainsKey("type") ? m["type"].ToString().ToLower() : "roders";
                     string ip = m.ContainsKey("ip") ? m["ip"].ToString() : "";
                     string sessionUrl = m.ContainsKey("sessionUrl") ? m["sessionUrl"].ToString() : "";

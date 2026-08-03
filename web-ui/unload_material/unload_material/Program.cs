@@ -39,7 +39,7 @@ namespace unload_material
         static bool ProcessTermination=false;
 
         // 数据库
-        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharSet=utf8;";
+        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
         static string DbType = "mysql";
         static CommonInterface Mysql;
         static plc Plc;
@@ -84,7 +84,7 @@ namespace unload_material
                         }
                         else
                         {
-                            ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharSet=utf8;";
+                            ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
                         }
                     }
 

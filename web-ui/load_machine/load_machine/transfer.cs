@@ -42,7 +42,7 @@ namespace load_machine
         static readonly string DisplayName = "传输程序";
 
         // 数据库
-        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharSet=utf8;";
+        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
         static CommonInterface Mysql;
 
         /// <summary>
@@ -181,7 +181,7 @@ namespace load_machine
                         string dbname = db.ContainsKey("database") ? db["database"].ToString() : "qianduantest";
                         string user = db.ContainsKey("user") ? db["user"].ToString() : "root";
                         string pwd = db.ContainsKey("password") ? db["password"].ToString() : "123456";
-                        ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharSet=utf8;";
+                        ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
                     }
 
                     // 加载共享服务器配置

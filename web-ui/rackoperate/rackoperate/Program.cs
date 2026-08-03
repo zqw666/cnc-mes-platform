@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // 料架操作 - SubProcess（多料架循环巡检版）
 // 1. 读取 config.json 中的 racks[] 料架配置
 // 2. 循环遍历每个料架（最多3轮）：
@@ -70,7 +70,7 @@ namespace rackoperate
         static string StopFlagFile;
         static bool IsStopRequested() { return File.Exists(StopFlagFile); }
 
-        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharSet=utf8;";
+        static string ConnStr = "Server=localhost;Database=qianduantest;Uid=root;Pwd=123456;CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
         static string DbType = "mysql";
 
         // ==================== 转台运动控制信号 ====================
@@ -136,7 +136,7 @@ namespace rackoperate
                     if (DbType == "sqlserver")
                         ConnStr = $"Server={host},{GetInt(db, "port", 1433)};Database={dbname};User Id={user};Password={pwd};";
                     else
-                        ConnStr = $"Server={host};Port={GetInt(db, "port", 3306)};Database={dbname};Uid={user};Pwd={pwd};CharSet=utf8;";
+                        ConnStr = $"Server={host};Port={GetInt(db, "port", 3306)};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
                 }
 
                 if (cfg.ContainsKey("plc"))
