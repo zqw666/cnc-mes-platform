@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -35,10 +35,10 @@
   <ItemGroup>
     <Reference Include="DataCommonOperate, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\DataCommonOperate.dll</HintPath>
+      <HintPath>..\..\lib\DataCommonOperate.dll</HintPath>
     </Reference>
     <Reference Include="MySql.Data">
-      <HintPath>..\..\MySql.Data.dll</HintPath>
+      <HintPath>..\..\lib\MySql.Data.dll</HintPath>
     </Reference>
     <Reference Include="PLC, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -46,11 +46,11 @@
     </Reference>
     <Reference Include="SerialPort, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\SerialPort.dll</HintPath>
+      <HintPath>..\..\lib\SerialPort.dll</HintPath>
     </Reference>
     <Reference Include="Rcd, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\Rcd.dll</HintPath>
+      <HintPath>..\..\lib\Rcd.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />

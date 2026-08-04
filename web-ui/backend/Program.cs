@@ -645,14 +645,6 @@ namespace MachineMonitor
                 if (path == "" || path == "/")
                 {
                     string indexPath = Path.Combine(ExeDir, "index.html");
-                    if (!File.Exists(indexPath))
-                        indexPath = Path.Combine(ExeDir, "..", "index.html");
-                    if (!File.Exists(indexPath))
-                        indexPath = Path.Combine(ExeDir, "..", "..", "index.html");
-                    if (!File.Exists(indexPath))
-                        indexPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "index.html");
-                    if (!File.Exists(indexPath))
-                        indexPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "index.html");
 
                     if (File.Exists(indexPath))
                     {
@@ -668,14 +660,6 @@ namespace MachineMonitor
                 else if (path.EndsWith(".js") || path.EndsWith(".css") || path.EndsWith(".html") || path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".ico"))
                 {
                     string filePath = Path.Combine(ExeDir, path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                    if (!File.Exists(filePath))
-                        filePath = Path.Combine(ExeDir, "..", path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                    if (!File.Exists(filePath))
-                        filePath = Path.Combine(ExeDir, "..", "..", path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                    if (!File.Exists(filePath))
-                        filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                    if (!File.Exists(filePath))
-                        filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
 
                     if (File.Exists(filePath))
                     {

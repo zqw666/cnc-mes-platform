@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net472</TargetFramework>
@@ -14,7 +14,7 @@
       <HintPath>..\..\CommonOperateDll\CommonOperateDll\DataCommonOperate\bin\Debug\DataCommonOperate.dll</HintPath>
     </Reference>
     <Reference Include="MySql.Data">
-      <HintPath>..\MySql.Data.dll</HintPath>
+      <HintPath>..\lib\MySql.Data.dll</HintPath>
     </Reference>
     <Reference Include="System.Web" />
     <Reference Include="System.Web.Extensions" />
