@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -67,7 +67,7 @@ namespace PLC
                 {
                     if (omronplc.WriteDM(Convert.ToUInt16(DM), Convert.ToUInt16(task)))
                     {
-                        flag = true;
+                        flag = cioval != 0;
                     }
                 }
                 catch (Exception e)
@@ -93,7 +93,7 @@ namespace PLC
                 {
                     if (omronplc.WriteWRBit(Convert.ToUInt16(NewStr[0]), Convert.ToByte(NewStr[1]), cioval))
                     {
-                        flag = true;
+                        flag = cioval != 0;
                     }
                 }
                 catch (Exception e)
@@ -118,7 +118,7 @@ namespace PLC
                 {
                     if (omronplc.WriteWR(Convert.ToUInt16(wr), cioval))
                     {
-                        flag = true;
+                        flag = cioval != 0;
                     }
                 }
                 catch (Exception e)
@@ -316,7 +316,7 @@ namespace PLC
                     }
                     else
                     {
-                        flag = true;
+                        flag = cioval != 0;
                     }
                 }
                 catch (Exception e)
@@ -352,7 +352,7 @@ namespace PLC
                 if (WriteDM(dm, task))//发送任务号
                 {
                     if (WriteWR(wr, 1))//给PLC发送任务开始信号
-                        flag = true;
+                        flag = cioval != 0;
                 }
             }
             return flag;

@@ -1,6 +1,6 @@
-# Roders数控机床数据采集与生产监控系统
+# 数控机床数据采集与生产监控系统
 
-基于 .NET Framework 4.7.2 的数控机床数据采集与生产监控系统，支持西门子、罗德斯等多种机床的 OPC UA 通信，包含完整的电极/刀具管理、料架管理、工作流调度功能。
+基于 .NET Framework 4.7.2 的多品牌数控机床数据采集与生产监控系统，支持西门子（Siemens）、罗德斯（Roders）、发那科（Fanuc）、欧姆龙（Omron）等多种机床，包含完整的电极/刀具管理、料架管理、工作流调度功能。
 
 ## 技术栈
 
@@ -9,7 +9,7 @@
 | 后端 | C# .NET Framework 4.7.2 |
 | 前端 | 原生 HTML + CSS + JavaScript |
 | 数据库 | MySQL / SQL Server |
-| 通信 | OPC UA (Siemens/Roders)、FOCAS (Fanuc)、HostLink (Omron) |
+| 通信 | OPC UA (西门子/罗德斯)、FOCAS (发那科)、HostLink (欧姆龙) |
 
 ## 项目结构
 

@@ -1,4 +1,4 @@
-﻿// ==================== 全局函数（必须在 DOMContentLoaded 外，HTML onclick 可访问） ====================
+// ==================== 全局函数（必须在 DOMContentLoaded 外，HTML onclick 可访问） ====================
 function toast(msg, type = 'info') {
   let el = document.getElementById('toast-box');
   if (!el) {
@@ -294,9 +294,10 @@ function removeMachine(index) {
 function renderWorkflow() {
   var container = document.getElementById('workflow-list');
   if (!container) return;
-  var section = container.closest('.config-subsection');
-  if (section) section.style.display = workflowConfig.length === 0 ? 'none' : 'block';
-  if (workflowConfig.length === 0) { container.innerHTML = ''; return; }
+  if (workflowConfig.length === 0) {
+    container.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:#8c9bb5;">暂无步骤，点击上方"+ 添加步骤"按钮添加</td></tr>';
+    return;
+  }
   container.innerHTML = workflowConfig.map(function(step, index) {
     return '<tr data-wf-index="' + index + '">' +
       '<td class="wf-seq">' + (index + 1) + '</td>' +
@@ -2066,3 +2067,4 @@ document.addEventListener('DOMContentLoaded', () => {
   restoreLineConfig();
   loadLineConfig();
 });
+
