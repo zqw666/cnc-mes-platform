@@ -113,7 +113,7 @@ namespace unload_material
             }
             catch (Exception ex)
             {
-                Log("WARN", "加载配置失败，使用默认配置: " + ex.Message);
+                LogHelper.Warn( "加载配置失败，使用默认配置: " + ex.Message);
             }
         }
 
@@ -141,7 +141,7 @@ namespace unload_material
 
         static void Main(string[] args)
         {
-            Log("INFO", "【" + DisplayName + "】分包启动");
+            LogHelper.Info( "【" + DisplayName + "】分包启动");
             try
             {
                 LoadConfig();
@@ -149,11 +149,11 @@ namespace unload_material
                 Plc = new plc();
                 if (!Plc.Connect(PlcIp, PlcPort))
                 {
-                    Log("ERROR", "PLC 连接失败: " + PlcIp);
+                    LogHelper.Error( "PLC 连接失败: " + PlcIp);
                     return;
                 }
-                Log("INFO", "PLC 连接成功");
-                Log("INFO", "PLC 连接成功");
+                LogHelper.Info( "PLC 连接成功");
+                LogHelper.Info( "PLC 连接成功");
 
                 List<string> followpiecelist = FollowpieceiList();
                 List<int> rackkongweilist = GetRack_administrateKongWeiList();
@@ -162,7 +162,7 @@ namespace unload_material
                     // 1. 执行置换夹爪流程
                     if (!ChangeGripper())
                     {
-                        Log("ERROR", "置换夹爪失败，退出下料流程");
+                        LogHelper.Error( "置换夹爪失败，退出下料流程");
                         return;
                     }
 
@@ -182,57 +182,57 @@ namespace unload_material
                             {
                                 if (!ExecuteTask(followpos))
                                 {
-                                    Log("ERROR", "机器人执行" + followpos + "料位抓取任务失败，终止该流程");
+                                    LogHelper.Error( "机器人执行" + followpos + "料位抓取任务失败，终止该流程");
                                     ProcessTermination = true;
                                     break;
                                 }
                                 if (!Updatefollowing_Rack(followpos, null, 1))
-                                    Log("ERROR", "更新随行台" + followpos + "料位状态失败！");
+                                    LogHelper.Error( "更新随行台" + followpos + "料位状态失败！");
                                 if (!Updaterobotmessage(workpiecename, 2))
-                                    Log("ERROR", "更新机器人夹爪工件信息失败");
+                                    LogHelper.Error( "更新机器人夹爪工件信息失败");
                                 if (!ExecuteTask(origionpos))
                                 {
-                                    Log("ERROR", "机器人执行" + followpos + "料位抓取任务失败，终止该流程");
+                                    LogHelper.Error( "机器人执行" + followpos + "料位抓取任务失败，终止该流程");
                                     ProcessTermination = true;
                                     break;
                                 }
                                 if (!Updaterobotmessage(null, 1))
-                                    Log("ERROR", "更新机器人夹爪工件信息失败");
+                                    LogHelper.Error( "更新机器人夹爪工件信息失败");
                                 if (!Updaterack_administrate(workpiecename, 2))
-                                    Log("ERROR", "更新料架" + origionpos + "料位状态失败！");
+                                    LogHelper.Error( "更新料架" + origionpos + "料位状态失败！");
                             }
                             else
                             {
                                 int rackpos = rackkongweilist[j];
                                 if (!ExecuteTask(followpos))
                                 {
-                                    Log("ERROR", "机器人执行" + followpos + "料位抓取任务失败，终止该流程");
+                                    LogHelper.Error( "机器人执行" + followpos + "料位抓取任务失败，终止该流程");
                                     ProcessTermination = true;
                                     break;
                                 }
                                 if (!Updatefollowing_Rack(followpos, null, 1))
-                                    Log("ERROR", "更新随行台" + followpos + "料位状态失败！");
+                                    LogHelper.Error( "更新随行台" + followpos + "料位状态失败！");
                                 if (!Updaterobotmessage(workpiecename, 2))
-                                    Log("ERROR", "更新机器人夹爪工件信息失败");
+                                    LogHelper.Error( "更新机器人夹爪工件信息失败");
                                 if (!ExecuteTask(rackpos))
                                 {
-                                    Log("ERROR", "机器人执行" + followpos + "料位抓取任务失败，终止该流程");
+                                    LogHelper.Error( "机器人执行" + followpos + "料位抓取任务失败，终止该流程");
                                     ProcessTermination = true;
                                     break;
                                 }
                                 if (!Updaterobotmessage(null, 1))
-                                    Log("ERROR", "更新机器人夹爪工件信息失败");
+                                    LogHelper.Error( "更新机器人夹爪工件信息失败");
                                 if (!Updaterack_administrate(workpiecename, 2))
-                                    Log("ERROR", "更新料架" + rackpos + "料位状态失败！");
+                                    LogHelper.Error( "更新料架" + rackpos + "料位状态失败！");
                             }
                         }
                     }
                 }
                 else if (followpiecelist.Count > 0 && !(rackkongweilist.Count > 0))
                 {
-                    Log("WARN", "检测到料架无空料位，请人工处理后再开启！");
+                    LogHelper.Warn( "检测到料架无空料位，请人工处理后再开启！");
                 }
-                Log("INFO", "【" + DisplayName + "】分包结束");
+                LogHelper.Info( "【" + DisplayName + "】分包结束");
             }
             catch (Exception ex)
             { }
@@ -245,20 +245,20 @@ namespace unload_material
         /// </summary>
         static bool ChangeGripper()
         {
-            Log("INFO", "开始置换夹爪流程...目标类型: " + TargetGripperType);
-            if (IsFixedGripper) { Log("INFO", "固定爪模式，无需置换"); return true; }
+            LogHelper.Info( "开始置换夹爪流程...目标类型: " + TargetGripperType);
+            if (IsFixedGripper) { LogHelper.Info( "固定爪模式，无需置换"); return true; }
             string cn="",ct="",cw=""; int cp=0;
-            try{using(DataTable dt=Mysql.ExeForDtl("SELECT clampname,clampstatus,clampposstatus,workpiecename FROM robotmessage LIMIT 1")){if(dt!=null&&dt.Rows.Count>0){cn=SafeStr(dt.Rows[0]["clampname"]);ct=SafeStr(dt.Rows[0]["clampstatus"]);cp=SafeInt(dt.Rows[0]["clampposstatus"]);cw=SafeStr(dt.Rows[0]["workpiecename"]);}}}catch(Exception ex){Log("ERROR","读取robotmessage失败:"+ex.Message);return false;}
-            if(cp==0){Log("INFO","手上无夹爪");return PickTargetGripper();}
-            if(IsT(ct)){Log("INFO","已为目标夹爪:"+cn);return true;}
-            Log("INFO","清空当前夹爪("+cn+")...");
-            if(!string.IsNullOrEmpty(cw)&&cw!="NULL"){int s=GetEmptyRackSlot();if(s==0){Log("ERROR","无料架空位");return false;}Plc.WriteDM(PlcDm,s);if(!WaitTask(300))return false;try{Mysql.ExecuteSql("UPDATE rack_administrate SET rfid='"+cw+"',scanstatus=1,posstatus=2 WHERE id="+s);}catch{}ClearRobotWp();}
+            try{using(DataTable dt=Mysql.ExeForDtl("SELECT clampname,clampstatus,clampposstatus,workpiecename FROM robotmessage LIMIT 1")){if(dt!=null&&dt.Rows.Count>0){cn=SafeStr(dt.Rows[0]["clampname"]);ct=SafeStr(dt.Rows[0]["clampstatus"]);cp=SafeInt(dt.Rows[0]["clampposstatus"]);cw=SafeStr(dt.Rows[0]["workpiecename"]);}}}catch(Exception ex){LogHelper.Error("读取robotmessage失败:"+ex.Message);return false;}
+            if(cp==0){LogHelper.Info("手上无夹爪");return PickTargetGripper();}
+            if(IsT(ct)){LogHelper.Info("已为目标夹爪:"+cn);return true;}
+            LogHelper.Info("清空当前夹爪("+cn+")...");
+            if(!string.IsNullOrEmpty(cw)&&cw!="NULL"){int s=GetEmptyRackSlot();if(s==0){LogHelper.Error("无料架空位");return false;}Plc.WriteDM(PlcDm,s);if(!WaitTask(300))return false;try{Mysql.ExecuteSql("UPDATE rack_administrate SET rfid='"+cw+"',scanstatus=1,posstatus=2 WHERE id="+s);}catch{}ClearRobotWp();}
             if(!ClearCurGrp(ct))return false;
             return PickTargetGripper();
         }
         static bool PickTargetGripper(){return PickGrp(TargetGripperType);}
-        static bool ClearCurGrp(string t){var g=FG(t);if(g==null)return true;if(!string.IsNullOrEmpty(g.SlotPhotoSignal)&&Plc.ReadWR(g.SlotPhotoSignal)){Log("ERROR","夹爪料位有异物");return false;}if(!string.IsNullOrEmpty(g.PlaceTaskNo)){int tn=ParseTaskNo(g.PlaceTaskNo)+(string.IsNullOrEmpty(g.Number)?0:int.Parse(g.Number));Plc.WriteDM(PlcDm,tn);if(!WaitTask(300))return false;}ClearRobotClamp();return true;}
-        static bool PickGrp(string t){var g=FG(t);if(g==null){Log("ERROR","未找到目标夹爪");return false;}if(!string.IsNullOrEmpty(g.GrabTaskNo)){int tn=ParseTaskNo(g.GrabTaskNo)+(string.IsNullOrEmpty(g.Number)?0:int.Parse(g.Number));Plc.WriteDM(PlcDm,tn);if(!WaitTask(300))return false;}try{Mysql.ExecuteSql("UPDATE robotmessage SET clampname='"+g.Name+"',clampstatus="+(t=="steel"?1:t=="tool"?2:t=="electrode"?3:4)+",clampposstatus=1,workpiecename=NULL,workpiecestatus=0");}catch{}Log("SUCCESS","已抓取:"+g.Name);return true;}
+        static bool ClearCurGrp(string t){var g=FG(t);if(g==null)return true;if(!string.IsNullOrEmpty(g.SlotPhotoSignal)&&Plc.ReadWR(g.SlotPhotoSignal)){LogHelper.Error("夹爪料位有异物");return false;}if(!string.IsNullOrEmpty(g.PlaceTaskNo)){int tn=ParseTaskNo(g.PlaceTaskNo)+(string.IsNullOrEmpty(g.Number)?0:int.Parse(g.Number));Plc.WriteDM(PlcDm,tn);if(!WaitTask(300))return false;}ClearRobotClamp();return true;}
+        static bool PickGrp(string t){var g=FG(t);if(g==null){LogHelper.Error("未找到目标夹爪");return false;}if(!string.IsNullOrEmpty(g.GrabTaskNo)){int tn=ParseTaskNo(g.GrabTaskNo)+(string.IsNullOrEmpty(g.Number)?0:int.Parse(g.Number));Plc.WriteDM(PlcDm,tn);if(!WaitTask(300))return false;}try{Mysql.ExecuteSql("UPDATE robotmessage SET clampname='"+g.Name+"',clampstatus="+(t=="steel"?1:t=="tool"?2:t=="electrode"?3:4)+",clampposstatus=1,workpiecename=NULL,workpiecestatus=0");}catch{}LogHelper.Success("已抓取:"+g.Name);return true;}
         static bool IsT(string t)=>string.Equals(t,TargetGripperType,StringComparison.OrdinalIgnoreCase)||(t=="1"&&TargetGripperType=="steel")||(t=="2"&&TargetGripperType=="tool")||(t=="3"&&TargetGripperType=="electrode")||(t=="4"&&TargetGripperType=="pallet");
         static GripperConfig FG(string t){foreach(var g in Grippers)if(string.Equals(g.Type,t,StringComparison.OrdinalIgnoreCase)||(t=="1"&&g.Type=="steel")||(t=="2"&&g.Type=="tool")||(t=="3"&&g.Type=="electrode")||(t=="4"&&g.Type=="pallet"))return g;return Grippers.Count>0?Grippers[0]:null;}
 
@@ -272,11 +272,11 @@ namespace unload_material
             bool flag = true;
             if (!Plc.WriteDM(PlcDm, tasknum))
             {
-                Log("ERROR", "发送任务失败，料位: " + tasknum);
+                LogHelper.Error( "发送任务失败，料位: " + tasknum);
                 flag = false;
             }
 
-            Log("INFO", "发送任务 " + tasknum + " 成功");
+            LogHelper.Info( "发送任务 " + tasknum + " 成功");
 
             // 等待任务完成
             int waitCount = 0;
@@ -288,10 +288,10 @@ namespace unload_material
 
             if (!Plc.ReadWR(TaskFinishAddr))
             {
-                Log("WARN", "等待任务完成超时，任务: " + tasknum);
+                LogHelper.Warn( "等待任务完成超时，任务: " + tasknum);
                 flag = false;
             }
-            Log("INFO", "执行任务 " + tasknum + " 成功");
+            LogHelper.Info( "执行任务 " + tasknum + " 成功");
             return flag;
         }
 
@@ -316,7 +316,7 @@ namespace unload_material
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新随行台信息异常: " + ex.Message);
+                LogHelper.Error( "更新随行台信息异常: " + ex.Message);
             }
             return flag;
         }
@@ -340,7 +340,7 @@ namespace unload_material
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新料架信息异常: " + ex.Message);
+                LogHelper.Error( "更新料架信息异常: " + ex.Message);
             }
             return flag;
         }
@@ -363,7 +363,7 @@ namespace unload_material
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新机器人夹爪信息异常: " + ex.Message);
+                LogHelper.Error( "更新机器人夹爪信息异常: " + ex.Message);
             }
             return flag;
         }
@@ -388,16 +388,16 @@ namespace unload_material
 
                 if (Mysql.ExecuteSql(sql))
                 {
-                    Log("INFO", $"更新robotmessage表成功 - 置换夹爪: clampname={clampName}, clampstatus={clampStatus}, clampposstatus=1");
+                    LogHelper.Info( $"更新robotmessage表成功 - 置换夹爪: clampname={clampName}, clampstatus={clampStatus}, clampposstatus=1");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 置换夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 置换夹爪");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -419,16 +419,16 @@ namespace unload_material
 
                 if (Mysql.ExecuteSql(sql))
                 {
-                    Log("INFO", $"更新robotmessage表成功 - 抓取夹爪: taskId={taskId}, clampposstatus=1, workpiecestatus=0");
+                    LogHelper.Info( $"更新robotmessage表成功 - 抓取夹爪: taskId={taskId}, clampposstatus=1, workpiecestatus=0");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 抓取夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 抓取夹爪");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -447,7 +447,7 @@ namespace unload_material
             }
             catch(Exception ex)
             {
-                Log("ERROR", "获取工件原始料位异常: " + ex.Message);
+                LogHelper.Error( "获取工件原始料位异常: " + ex.Message);
             }
             return origionpos;
         }
@@ -530,26 +530,6 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         /// 更新UI界面日志
         /// </summary>
         /// <param name="level"></param>
-        /// <param name="content">日志内容</param>
-        static void Log(string level, string content)
-        {
-            string msg = "[" + level + "] " + content;
-            Console.WriteLine(msg);
-
-            try
-            {
-                var body = Js.Serialize(new { step = StepName, displayName = DisplayName, level, content = msg });
-                var bytes = Encoding.UTF8.GetBytes(body);
-                var req = WebRequest.CreateHttp(ApiBase + "/api/sub/log");
-                req.Method = "POST";
-                req.ContentType = "application/json";
-                req.Timeout = 3000;
-                using (var rs = req.GetRequestStream())
-                    rs.Write(bytes, 0, bytes.Length);
-                try { req.GetResponse().Close(); } catch { }
-            }
-            catch { }
-        }
         static string SafeStr(object v)=>v==DBNull.Value?"":v?.ToString()??"";
         static int SafeInt(object v)=>v==DBNull.Value?0:Convert.ToInt32(v);
         static bool WaitTask(int m){int w=0;while(w<m){if(Plc.ReadWR(TaskFinishAddr))return true;Thread.Sleep(100);w++;}return Plc.ReadWR(TaskFinishAddr);}

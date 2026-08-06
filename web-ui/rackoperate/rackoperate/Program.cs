@@ -91,7 +91,7 @@ namespace rackoperate
         // ==================== Main ====================
         static void Main(string[] args)
         {
-            Log("INFO", "【" + DisplayName + "】分包启动");
+            LogHelper.Info( "【" + DisplayName + "】分包启动");
 
             try
             {
@@ -102,19 +102,19 @@ namespace rackoperate
 
                 if (Racks.Count == 0)
                 {
-                    Log("WARN", "检测到系统没有料架配置，结束料架操作流程");
+                    LogHelper.Warn( "检测到系统没有料架配置，结束料架操作流程");
                     return;
                 }
-                Log("INFO", "加载料架配置完成，共 " + Racks.Count + " 个料架");
+                LogHelper.Info( "加载料架配置完成，共 " + Racks.Count + " 个料架");
 
                 Work();
             }
             catch (Exception ex)
             {
-                Log("ERROR", "执行异常: " + ex.Message);
+                LogHelper.Error( "执行异常: " + ex.Message);
             }
 
-            Log("INFO", "【" + DisplayName + "】分包结束");
+            LogHelper.Info( "【" + DisplayName + "】分包结束");
         }
 
         // ==================== 加载配置 ====================
@@ -122,7 +122,7 @@ namespace rackoperate
         {
             try
             {
-                if (!File.Exists(ConfigPath)) { Log("WARN", "配置文件不存在: " + ConfigPath); return; }
+                if (!File.Exists(ConfigPath)) { LogHelper.Warn( "配置文件不存在: " + ConfigPath); return; }
                 var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
 
                 if (cfg.ContainsKey("database"))
@@ -165,10 +165,10 @@ namespace rackoperate
                         foreach (var item in ie) { var r = item as Dictionary<string, object>; if (r != null) Racks.Add(ParseRackConfig(r)); }
                 }
 
-                Log("INFO", string.Format("配置加载完成: PLC={0}:{1}, 料架数={2}, 机器人任务完成信号={3}",
+                LogHelper.Info( string.Format("配置加载完成: PLC={0}:{1}, 料架数={2}, 机器人任务完成信号={3}",
                     PlcIp, PlcPort, Racks.Count, RobotTaskDoneAddr));
             }
-            catch (Exception ex) { Log("WARN", "加载配置失败: " + ex.Message); }
+            catch (Exception ex) { LogHelper.Warn( "加载配置失败: " + ex.Message); }
         }
 
         static RackConfig ParseRackConfig(Dictionary<string, object> r)
@@ -198,10 +198,10 @@ namespace rackoperate
             var plc = new plc();
             if (!plc.Connect(PlcIp, PlcPort))
             {
-                Log("ERROR", "PLC 连接失败: " + PlcIp + ":" + PlcPort);
+                LogHelper.Error( "PLC 连接失败: " + PlcIp + ":" + PlcPort);
                 return;
             }
-            Log("INFO", "PLC 连接成功: " + PlcIp);
+            LogHelper.Info( "PLC 连接成功: " + PlcIp);
 
             // 停止标志文件
             StopFlagFile = Path.Combine(
@@ -215,7 +215,7 @@ namespace rackoperate
                 int roundsWithoutRequest = 0;    // 连续无请求轮数
                 bool anyRequestHandled = false;
 
-                Log("INFO", "开始多料架循环巡检 (最多3轮，共 " + maxRounds + " 次判定)");
+                LogHelper.Info( "开始多料架循环巡检 (最多3轮，共 " + maxRounds + " 次判定)");
 
                 for (int idx = 0; idx < maxRounds; idx++)
                 {
@@ -223,7 +223,7 @@ namespace rackoperate
                     var rack = Racks[rackIndex];
                     int round = (idx / totalRacks) + 1;
 
-                    Log("INFO", string.Format("--- [轮{0}/{2}] 料架: {1} ---",
+                    LogHelper.Info( string.Format("--- [轮{0}/{2}] 料架: {1} ---",
                         round, rack.Name, totalRacks));
 
                     try
@@ -235,7 +235,7 @@ namespace rackoperate
                             anyRequestHandled = true;
                             roundsWithoutRequest = 0;
                             // 处理完开门请求后(已等门关+读光电+更新DB)，退出整个流程
-                            Log("INFO", "料架 " + rack.Name + " 已完成开门处理，结束料架操作流程");
+                            LogHelper.Info( "料架 " + rack.Name + " 已完成开门处理，结束料架操作流程");
                             break;
                         }
                         else
@@ -245,14 +245,14 @@ namespace rackoperate
                     }
                     catch (Exception ex)
                     {
-                        Log("ERROR", "处理料架 " + rack.Name + " 异常: " + ex.Message);
+                        LogHelper.Error( "处理料架 " + rack.Name + " 异常: " + ex.Message);
                         roundsWithoutRequest++;
                     }
 
                     // 如果已经3整轮没有收到任何请求，退出
                     if (roundsWithoutRequest >= maxRounds)
                     {
-                        Log("INFO", "连续 " + totalRacks + " 轮未收到开门请求，结束料架操作流程");
+                        LogHelper.Info( "连续 " + totalRacks + " 轮未收到开门请求，结束料架操作流程");
                         break;
                     }
 
@@ -260,12 +260,12 @@ namespace rackoperate
                 }
 
                 if (!anyRequestHandled)
-                    Log("INFO", "无料架收到开门请求，流程结束");
+                    LogHelper.Info( "无料架收到开门请求，流程结束");
             }
             finally
             {
                 plc.close();
-                Log("INFO", "PLC 连接关闭");
+                LogHelper.Info( "PLC 连接关闭");
             }
         }
 
@@ -278,22 +278,22 @@ namespace rackoperate
         /// <returns>true=执行成功, false=执行失败</returns>
         static bool RunMC1Magazine(plc plc, int toolNo)
         {
-            Log("INFO", "【MC1刀库】检查门关闭信号 " + MC1DoorClosed);
+            LogHelper.Info( "【MC1刀库】检查门关闭信号 " + MC1DoorClosed);
             if (plc.ReadWR(MC1DoorClosed))
             {
-                Log("WARN", "【MC1刀库】刀库门未关闭(信号=1)，旋转失败");
+                LogHelper.Warn( "【MC1刀库】刀库门未关闭(信号=1)，旋转失败");
                 return false;
             }
             plc.WriteWR(MC1RotateStart, 0);
-            Log("INFO", "【MC1刀库】旋转至 " + toolNo + " 号刀");
+            LogHelper.Info( "【MC1刀库】旋转至 " + toolNo + " 号刀");
             plc.WriteDM(MC1TaskDM, toolNo);
             plc.WriteWR(MC1RotateStart, 1);
 
-            Log("INFO", "【MC1刀库】等待转到位信号 " + MC1RotateDone);
+            LogHelper.Info( "【MC1刀库】等待转到位信号 " + MC1RotateDone);
             while (!plc.ReadWR(MC1RotateDone))
                 Thread.Sleep(200);
             plc.WriteWR(MC1RotateStart, 0);
-            Log("SUCCESS", "【MC1刀库】" + toolNo + " 号刀旋转到位");
+            LogHelper.Success( "【MC1刀库】" + toolNo + " 号刀旋转到位");
             return true;
         }
 
@@ -306,18 +306,18 @@ namespace rackoperate
         /// <returns>true=执行成功, false=执行失败</returns>
         static bool RunTurntable(plc plc, int angle)
         {
-            Log("INFO", "【转台】移动至 " + angle + " 度");
+            LogHelper.Info( "【转台】移动至 " + angle + " 度");
             plc.WriteWr(SignalDegree, (ushort)angle);
             plc.WriteWR(SignalAllowMove, 1);
             plc.WriteWR(SignalStartMove, 1);
 
-            Log("INFO", "【转台】等待到位信号 " + SignalMoveDone);
+            LogHelper.Info( "【转台】等待到位信号 " + SignalMoveDone);
             while (!plc.ReadWR(SignalMoveDone))
                 Thread.Sleep(200);
 
             plc.WriteWR(SignalAllowMove, 0);
             plc.WriteWR(SignalStartMove, 0);
-            Log("SUCCESS", "【转台】" + angle + " 度移动完成");
+            LogHelper.Success( "【转台】" + angle + " 度移动完成");
             return true;
         }
 
@@ -327,15 +327,15 @@ namespace rackoperate
         /// </summary>
         static bool TurntableReturnZero(plc plc)
         {
-            Log("INFO", "【转台】回零开始: " + SignalReturnZero);
+            LogHelper.Info( "【转台】回零开始: " + SignalReturnZero);
             plc.WriteWR(SignalReturnZero, 1);
 
-            Log("INFO", "【转台】等待零点信号 " + SignalAtZero);
+            LogHelper.Info( "【转台】等待零点信号 " + SignalAtZero);
             while (!plc.ReadWR(SignalAtZero))
                 Thread.Sleep(200);
 
             plc.WriteWR(SignalReturnZero, 0);
-            Log("SUCCESS", "【转台】已回到零点");
+            LogHelper.Success( "【转台】已回到零点");
             return true;
         }
 
@@ -347,7 +347,7 @@ namespace rackoperate
         {
             if (string.IsNullOrEmpty(rack.DoorClosed) || string.IsNullOrEmpty(rack.OpenRequest))
             {
-                Log("WARN", "料架 " + rack.Name + " 缺少信号配置，跳过");
+                LogHelper.Warn( "料架 " + rack.Name + " 缺少信号配置，跳过");
                 return false;
             }
 
@@ -357,13 +357,13 @@ namespace rackoperate
             // ---- 场景A: 门关闭 ---- 
             if (doorClosed)
             {
-                Log("INFO", "料架 " + rack.Name + " 门已关闭，等待人工开门请求 (5秒超时)...");
+                LogHelper.Info( "料架 " + rack.Name + " 门已关闭，等待人工开门请求 (5秒超时)...");
 
                 bool requestReceived = false;
                 int waitTicks = 0;
                 while (waitTicks < 50)
                 {
-                    if (IsStopRequested()) { Log("INFO", "收到停止信号"); return false; }
+                    if (IsStopRequested()) { LogHelper.Info( "收到停止信号"); return false; }
                     requestReceived = plc.ReadWR(rack.OpenRequest);
                     if (requestReceived) break;
                     Thread.Sleep(100);
@@ -372,59 +372,59 @@ namespace rackoperate
 
                 if (!requestReceived)
                 {
-                    Log("INFO", "料架 " + rack.Name + " 5秒内未收到开门请求");
+                    LogHelper.Info( "料架 " + rack.Name + " 5秒内未收到开门请求");
                     return false;
                 }
 
-                Log("INFO", "料架 " + rack.Name + " 收到人工开门请求");
+                LogHelper.Info( "料架 " + rack.Name + " 收到人工开门请求");
 
                 // 检查机器人任务完成信号
                 bool robotTaskDone = false;
                 if (!string.IsNullOrEmpty(RobotTaskDoneAddr))
                 {
                     robotTaskDone = plc.ReadWR(RobotTaskDoneAddr);
-                    Log("INFO", "机器人任务完成信号: " + (robotTaskDone ? "已置位" : "未置位"));
+                    LogHelper.Info( "机器人任务完成信号: " + (robotTaskDone ? "已置位" : "未置位"));
                 }
                 else { robotTaskDone = true; }
 
                 if (!robotTaskDone)
                 {
-                    Log("WARN", "机器人任务未完成，拒绝开门请求");
+                    LogHelper.Warn( "机器人任务未完成，拒绝开门请求");
                     return false;
                 }
 
                 // 允许开门
                 if (!string.IsNullOrEmpty(rack.OpenAllow))
                 {
-                    Log("INFO", "发送允许开门信号: " + rack.OpenAllow);
+                    LogHelper.Info( "发送允许开门信号: " + rack.OpenAllow);
                     plc.WriteWR(rack.OpenAllow, 1);
                     Thread.Sleep(500);
                     plc.WriteWR(rack.OpenAllow, 0);
                 }
 
                 // 等待门打开（doorClosed 变为 0），直到停止信号
-                Log("INFO", "等待门打开 (doorClosed→0)...");
+                LogHelper.Info( "等待门打开 (doorClosed→0)...");
                 while (true)
                 {
-                    if (IsStopRequested()) { Log("INFO", "收到停止信号"); return true; }
+                    if (IsStopRequested()) { LogHelper.Info( "收到停止信号"); return true; }
                     doorClosed = plc.ReadWR(rack.DoorClosed);
                     if (!doorClosed) break;
                     Thread.Sleep(500);
                 }
-                Log("INFO", "门已打开，置位 doorFlag = 1 (等待门关闭后复位)");
+                LogHelper.Info( "门已打开，置位 doorFlag = 1 (等待门关闭后复位)");
 
                 // 置位 doorFlag
                 if (!string.IsNullOrEmpty(rack.DoorFlag))
                     plc.WriteWR(rack.DoorFlag, 1);
                 else
-                    Log("WARN", "料架 " + rack.Name + " 未配置 doorFlag 信号地址");
+                    LogHelper.Warn( "料架 " + rack.Name + " 未配置 doorFlag 信号地址");
 
                 // 等待门再次关闭（doorClosed 变为 1），直到停止信号
-                Log("INFO", "等待门关闭 (doorClosed→1)...");
+                LogHelper.Info( "等待门关闭 (doorClosed→1)...");
                 while (true)
                 {
                     if (IsStopRequested()) {
-                        Log("INFO", "收到停止信号，复位 doorFlag");
+                        LogHelper.Info( "收到停止信号，复位 doorFlag");
                         if (!string.IsNullOrEmpty(rack.DoorFlag)) plc.WriteWR(rack.DoorFlag, 0);
                         return true;
                     }
@@ -437,23 +437,23 @@ namespace rackoperate
                 if (!string.IsNullOrEmpty(rack.DoorFlag))
                     plc.WriteWR(rack.DoorFlag, 0);
 
-                Log("INFO", "门已关闭，读取光电信号变化...");
+                LogHelper.Info( "门已关闭，读取光电信号变化...");
                 ReadPhotoelectricSignals(plc, rack);
 
-                Log("SUCCESS", "料架 " + rack.Name + " 开门处理完成");
+                LogHelper.Success( "料架 " + rack.Name + " 开门处理完成");
                 return true;
             }
 
             // ---- 场景B: 门打开 ----
             // 门已打开说明有人在操作，持续等待门关闭直到收到停止信号或进程被终止
-            Log("INFO", "料架 " + rack.Name + " 门当前打开，持续等待门关闭...");
+            LogHelper.Info( "料架 " + rack.Name + " 门当前打开，持续等待门关闭...");
 
             while (true)
             {
                 // 检查停止标志
                 if (IsStopRequested())
                 {
-                    Log("INFO", "收到流程终止信号，结束等待");
+                    LogHelper.Info( "收到流程终止信号，结束等待");
                     try { File.Delete(StopFlagFile); } catch { }
                     return false;
                 }
@@ -461,9 +461,9 @@ namespace rackoperate
                 doorClosed = plc.ReadWR(rack.DoorClosed);
                 if (doorClosed)
                 {
-                    Log("INFO", "料架 " + rack.Name + " 门已关闭，读取光电信号变化...");
+                    LogHelper.Info( "料架 " + rack.Name + " 门已关闭，读取光电信号变化...");
                     ReadPhotoelectricSignals(plc, rack);
-                    Log("SUCCESS", "料架 " + rack.Name + " 门关闭处理完成，结束料架操作流程");
+                    LogHelper.Success( "料架 " + rack.Name + " 门关闭处理完成，结束料架操作流程");
                     return true;
                 }
 
@@ -476,13 +476,13 @@ namespace rackoperate
         {
             if (string.IsNullOrEmpty(rack.PhotoSignal))
             {
-                Log("WARN", "料架 " + rack.Name + " 未配置光电信号地址");
+                LogHelper.Warn( "料架 " + rack.Name + " 未配置光电信号地址");
                 return;
             }
             int baseAddr = ParseDMAddress(rack.PhotoSignal);
             int layerCount = rack.Rows;
 
-            Log("INFO", string.Format("读取料架 {0} 光电: DM{1}→DM{2}", rack.Name, baseAddr, baseAddr + layerCount - 1));
+            LogHelper.Info( string.Format("读取料架 {0} 光电: DM{1}→DM{2}", rack.Name, baseAddr, baseAddr + layerCount - 1));
 
             var changedLayers = new List<int>();
             for (int i = 0; i < layerCount; i++)
@@ -497,11 +497,11 @@ namespace rackoperate
 
             if (changedLayers.Count > 0)
             {
-                Log("INFO", "料架 " + rack.Name + " 变化层: " + string.Join(",", changedLayers));
+                LogHelper.Info( "料架 " + rack.Name + " 变化层: " + string.Join(",", changedLayers));
                 UpdateScanStatus(rack, changedLayers);
             }
             else
-                Log("INFO", "料架 " + rack.Name + " 无光电变化");
+                LogHelper.Info( "料架 " + rack.Name + " 无光电变化");
         }
 
         static int ParseDMAddress(string addr)
@@ -517,7 +517,7 @@ namespace rackoperate
             try
             {
                 var db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
-                if (db == null) { Log("ERROR", "创建数据库实例失败"); return; }
+                if (db == null) { LogHelper.Error( "创建数据库实例失败"); return; }
 
                 int updatedCount = 0;
                 int rackNum = 0;
@@ -528,15 +528,15 @@ namespace rackoperate
                     string sql = "UPDATE rack_administrate SET scanstatus = 0 WHERE racknum = " + rackNum +
                                  " AND id LIKE '" + layer + "%' AND posstatus = 1";
                     bool ok = false;
-                    try { ok = db.ExecuteSql(sql); } catch (Exception ex) { Log("WARN", "SQL异常: " + ex.Message); }
+                    try { ok = db.ExecuteSql(sql); } catch (Exception ex) { LogHelper.Warn( "SQL异常: " + ex.Message); }
                     if (ok) { updatedCount++; NotifyLayerToScan(rack, layer, 1); }
-                    Log("INFO", "更新料架 " + rack.Name + " 第" + layer + "层: " + (ok ? "成功" : "失败"));
+                    LogHelper.Info( "更新料架 " + rack.Name + " 第" + layer + "层: " + (ok ? "成功" : "失败"));
                 }
 
-                Log("SUCCESS", "料架 " + rack.Name + " 共更新 " + updatedCount + " 层为待扫描");
+                LogHelper.Success( "料架 " + rack.Name + " 共更新 " + updatedCount + " 层为待扫描");
                 if (updatedCount > 0) TriggerRackRefresh();
             }
-            catch (Exception ex) { Log("ERROR", "更新扫描状态失败: " + ex.Message); }
+            catch (Exception ex) { LogHelper.Error( "更新扫描状态失败: " + ex.Message); }
         }
 
         static void NotifyLayerToScan(RackConfig rack, int layer, int count)
@@ -568,22 +568,6 @@ namespace rackoperate
             catch { }
         }
 
-        // ==================== 日志 ====================
-        static void Log(string level, string content)
-        {
-            string msg = "[" + level + "] " + content;
-            Console.WriteLine(msg);
-            try
-            {
-                var body = Js.Serialize(new { step = StepName, displayName = DisplayName, level, content = msg });
-                var bytes = Encoding.UTF8.GetBytes(body);
-                var req = WebRequest.CreateHttp(ApiBase + "/api/sub/log");
-                req.Method = "POST"; req.ContentType = "application/json"; req.Timeout = 3000;
-                using (var rs = req.GetRequestStream()) rs.Write(bytes, 0, bytes.Length);
-                try { req.GetResponse().Close(); } catch { }
-            }
-            catch { }
-        }
 
         // ==================== 辅助 ====================
         static Dictionary<string, object> GetDict(Dictionary<string, object> d, string key)

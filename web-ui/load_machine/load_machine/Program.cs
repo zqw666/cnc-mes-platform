@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.IO;
@@ -68,27 +68,29 @@ namespace load_machine
         static string TaskStartAddr;   // 任务开始信号
         static string TaskFinishAddr;   // 任务完成信号
         static string RobotEleAddr;
+        static int MachineStartTaskNo;  // 西门子启动加工任务号（0=未配置，回退机床通讯启动）
         static CommonInterface Mysql;
         static void Main(string[] args)
         {
-            Log("INFO", "【" + DisplayName + "】分包启动");
+            LogHelper.Info( "【" + DisplayName + "】分包启动");
             try
             {
                 LoadConfig();
                 InitMachines();
+                LogHelper.Configure(StepName, DisplayName, ApiBase);
                 CommonInterface Mysql = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
                 Plc = new plc();
                 if (!Plc.Connect(PlcIp, PlcPort))
                 {
-                    Log("ERROR", "PLC 连接失败: " + PlcIp);
+                    LogHelper.Error( "PLC 连接失败: " + PlcIp);
                     return;
                 }
-                Log("INFO", "PLC 连接成功");
+                LogHelper.Info( "PLC 连接成功");
 
                 List<string> waitmaclist = Waitmaclist();
                 if (waitmaclist.Count == 0)
                 {
-                    Log("INFO", "无待机机床，退出上机流程");
+                    LogHelper.Info( "无待机机床，退出上机流程");
                     return;
                 }
 
@@ -102,137 +104,116 @@ namespace load_machine
                     followpiecelist = FollowHavePieceList();
                     if (followpiecelist.Count == 0)
                     {
-                        Log("INFO", "有随行台但无待上机工件，退出上机流程");
+                        LogHelper.Info( "有随行台但无待上机工件，退出上机流程");
                         return;
                     }
-                    Log("INFO", "随行台模式：共 " + followpiecelist.Count + " 个待上机工件");
+                    LogHelper.Info( "随行台模式：共 " + followpiecelist.Count + " 个待上机工件");
                 }
                 else
                 {
                     robotPieceName = GetRobotMessagePieceMessage();
                     if (string.IsNullOrEmpty(robotPieceName))
                     {
-                        Log("INFO", "无随行台且机器人夹爪无工件，退出上机流程");
+                        LogHelper.Info( "无随行台且机器人夹爪无工件，退出上机流程");
                         return;
                     }
-                    Log("INFO", "无随行台，机器人夹爪有工件: " + robotPieceName);
+                    LogHelper.Info( "无随行台，机器人夹爪有工件: " + robotPieceName);
                 }
 
                 // 1. 执行置换夹爪流程
                 if (!ChangeGripper())
                 {
-                    Log("ERROR", "置换夹爪失败，退出上机流程");
+                    LogHelper.Error( "置换夹爪失败，退出上机流程");
                     ProcessTermination = true;
                     return;
                 }
 
+                // 2. 选择第一台待机机床（一次流程只上 1 件）
+                int macnum = Convert.ToInt16(waitmaclist[0].Split(',')[0]);
+                string ip = waitmaclist[0].Split(',')[1];
+
+                // 3. 检查该机床是否有空工位，无空工位则退出
+                int worknum = GetMacFirstEmptyWorknum(macnum);
+                if (worknum == 0)
+                {
+                    LogHelper.Info( "机床" + macnum + " 工位已满，退出上机流程");
+                    return;
+                }
+
+                // 4. 确定本件工件来源
+                string workpiecename = null;
                 if (hasShuttle)
                 {
-                    // ===== 有随行台：从随行台取料 → 放机床 =====
-                    for (int i = 0; i < waitmaclist.Count; i++)
+                    // 从随行台取第一个待上机工件
+                    int followpos = Convert.ToInt16(followpiecelist[0].Split(',')[0]);
+                    workpiecename = followpiecelist[0].Split(',')[1];
+                    LogHelper.Info( "上机: 随行台" + followpos + "(" + workpiecename + ") → 机床" + macnum + " 工位" + worknum);
+
+                    if (!ExecuteTask(followpos))
                     {
-                        if (ProcessTermination) break;
-                        for (int j = 0; j < followpiecelist.Count; j++)
-                        {
-                            if (ProcessTermination) break;
-                            int macnum = Convert.ToInt16(waitmaclist[i].Split(',')[0]);
-                            string ip = waitmaclist[i].Split(',')[1];
-
-                            // 检查机床上是否已有工件，有则跳过
-                            if (MachineHasPiece(macnum))
-                            {
-                                Log("INFO", "机床" + macnum + " 上已有工件，跳过该机床");
-                                break;
-                            }
-
-                            int followpos = Convert.ToInt16(followpiecelist[j].Split(',')[0]);
-                            string workpiecename = followpiecelist[j].Split(',')[1];
-
-                            if (!ExecuteTask(followpos))
-                            {
-                                Log("ERROR", "机器人执行从随行台" + followpos + "料位抓取任务失败，退出上机流程！");
-                                ProcessTermination = true;
-                                break;
-                            }
-                            if (!Updatefollowing_Rack(followpos, null, 1))
-                                Log("ERROR", "更新随行台" + followpos + "料位信息失败！");
-                            if (!Updaterobotmessage(workpiecename, 2))
-                                Log("ERROR", "更新机器人手爪信息失败！");
-                            if (!OpenMachineDoorIfRoders(macnum))
-                            {
-                                ProcessTermination = true;
-                                break;
-                            }
-                            if (!ExecuteTask(macnum))
-                            {
-                                Log("ERROR", "机器人执行放置工件到" + macnum + "任务失败，退出上机流程！");
-                                ProcessTermination = true;
-                                break;
-                            }
-                            CloseMachineDoorIfRoders(macnum);
-                            if (!Updaterobotmessage(null, 1))
-                                Log("ERROR", "更新机器人手爪信息失败！");
-                            if (!UpdateMacWorkPosStatus(macnum, workpiecename, 0))
-                                Log("ERROR", "更新机床工位表" + macnum + "工件信息失败！");
-                            bool uploaded = HandleUploadProgram(macnum, ip, workpiecename);
-                            if (!uploaded && GetMacEmptyPositions(macnum).Count == 0)
-                            {
-                                Log("INFO", "机床" + macnum + "无空工位，跳过上机流程！");
-                                break;
-                            }
-                            if (uploaded && !UpdateMacWorkPosStatus(macnum, workpiecename, 1))
-                                Log("ERROR", "更新机床工位" + macnum + "工件状态失败！");
-                            if (!Updaterack_administrate(workpiecename, 1))
-                                Log("ERROR", "更新料架" + workpiecename + "工件加工状态失败！");
-                        }
+                        LogHelper.Error( "机器人执行从随行台" + followpos + "料位抓取任务失败，退出上机流程！");
+                        ProcessTermination = true;
+                        return;
                     }
+                    if (!Updatefollowing_Rack(followpos, null, 1))
+                        LogHelper.Error( "更新随行台" + followpos + "料位信息失败！");
+                    if (!Updaterobotmessage(workpiecename, 2))
+                        LogHelper.Error( "更新机器人手爪信息失败！");
                 }
                 else
                 {
-                    // ===== 无随行台：机器人夹爪已有工件 → 直接放机床 =====
-                    int macnum = Convert.ToInt16(waitmaclist[0].Split(',')[0]);
-                    string ip = waitmaclist[0].Split(',')[1];
-
-                    // 机床上已有工件 → 退出
-                    if (MachineHasPiece(macnum))
-                    {
-                        Log("INFO", "机床" + macnum + " 已有工件，退出上机流程");
-                        return;
-                    }
-
-                    // 机床上无工件 且 机器人有工件 → 执行上机
-                    if (!MachineHasPiece(macnum) && !string.IsNullOrEmpty(robotPieceName))
-                    {
-                        if (!OpenMachineDoorIfRoders(macnum))
-                        {
-                            ProcessTermination = true;
-                            return;
-                        }
-                        if (!ExecuteTask(macnum))
-                        {
-                            Log("ERROR", "机器人执行放置工件到" + macnum + "任务失败，退出上机流程！");
-                            ProcessTermination = true;
-                            return;
-                        }
-                        Log("INFO", "机器人执行放置工件到" + macnum + "任务成功！");
-                        CloseMachineDoorIfRoders(macnum);
-                        if (!Updaterobotmessage(null, 1))
-                            Log("ERROR", "更新机器人手爪信息失败！");
-                        if (!UpdateMacWorkPosStatus(macnum, robotPieceName, 0))
-                            Log("ERROR", "更新机床工位表" + macnum + "工件信息失败！");
-                        bool uploaded = HandleUploadProgram(macnum, ip, robotPieceName);
-                        if (!uploaded && GetMacEmptyPositions(macnum).Count == 0)
-                        {
-                            Log("INFO", "机床" + macnum + "无空工位，跳过上机流程！");
-                            return;
-                        }
-                        if (uploaded && !UpdateMacWorkPosStatus(macnum, robotPieceName, 1))
-                            Log("ERROR", "更新机床工位" + macnum + "工件状态失败！");
-                        if (!Updaterack_administrate(robotPieceName, 1))
-                            Log("ERROR", "更新料架" + robotPieceName + "工件加工状态失败！");
-                    }
+                    workpiecename = robotPieceName;
+                    LogHelper.Info( "上机: 机器人工件(" + workpiecename + ") → 机床" + macnum + " 工位" + worknum);
                 }
-                Log("INFO", "【" + DisplayName + "】分包结束");
+
+                // 5. 放置工件到机床（任务号规则待定，收敛为 GetPlaceTaskNo）
+                if (!OpenMachineDoorIfRoders(macnum))
+                {
+                    ProcessTermination = true;
+                    return;
+                }
+                int placeTaskNo = GetPlaceTaskNo(macnum, worknum);
+                if (!ExecuteTask(placeTaskNo))
+                {
+                    LogHelper.Error( "机器人执行放置工件到" + macnum + "任务失败，退出上机流程！");
+                    ProcessTermination = true;
+                    return;
+                }
+                LogHelper.Info( "机器人执行放置工件到" + macnum + "任务成功！");
+                CloseMachineDoorIfRoders(macnum);
+                if (!Updaterobotmessage(null, 1))
+                    LogHelper.Error( "更新机器人手爪信息失败！");
+
+                // 6. 工位表记录（待加工）
+                if (!UpdateMacWorkPosStatus(macnum, worknum, workpiecename, 0))
+                    LogHelper.Error( "更新机床工位表" + macnum + "工件信息失败！");
+
+                // 7. 判断是否已放满：未满则不启动加工，等待后续上机
+                int emptyPos = GetMacEmptyPositions(macnum).Count;
+                int totalPos = GetMacTotalPositions(macnum);
+                if (emptyPos > 0)
+                {
+                    LogHelper.Info( "机床" + macnum + " 已上" + (totalPos - emptyPos) + "/" + totalPos + "件，未满" + totalPos + "件，不启动加工，等待下次上机");
+                    LogHelper.Info( "【" + DisplayName + "】分包结束（待放满后启动加工）");
+                    return;
+                }
+
+                // 8. 已放满：上传合并程序 + 启动加工
+                bool uploaded = HandleUploadProgram(macnum, ip, workpiecename);
+                if (!uploaded)
+                {
+                    LogHelper.Error( "上传程序/启动加工失败，工件保持待加工状态，需人工处理");
+                    return;
+                }
+
+                // 9. 启动成功后更新该机床所有有件工位为加工中
+                if (!UpdateMacWorkPosStatusAll(macnum, 1))
+                    LogHelper.Error( "更新机床" + macnum + "工位加工状态失败！");
+                foreach (string wpn in GetMacFilledWorkpieces(macnum))
+                    if (!Updaterack_administrate(wpn, 1))
+                        LogHelper.Error( "更新料架" + wpn + "工件加工状态失败！");
+
+                LogHelper.Info( "【" + DisplayName + "】分包结束");
             }
             catch (Exception ex)
             { }
@@ -249,7 +230,7 @@ namespace load_machine
             try
             {
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
-                string str = "select * from following_rack where posstatus=2 and workstate=0";
+                string str = "select * from following_rack where posstatus=2 and workpieceworkstate=0";
                 DataTable dt = Db.ExeForDtl(str);
                 foreach(DataRow r in dt.Rows)
                 {
@@ -306,14 +287,14 @@ namespace load_machine
             try
             {
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
-                string workpieceStr = string.IsNullOrEmpty(workpiecename) ? "NULL" : "'" + workpiecename + "'";
+                string workpieceStr = string.IsNullOrEmpty(workpiecename) ? "''" : "'" + workpiecename + "'";
                 string str = "update following_rack set workpiecename=" + workpieceStr + ",posstatus=" + posstatus + " where id=" + pos;
                 if (Db.ExecuteSql(str))
                     flag = true;
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新随行台信息异常: " + ex.Message);
+                LogHelper.Error( "更新随行台信息异常: " + ex.Message);
             }
             return flag;
         }
@@ -331,14 +312,15 @@ namespace load_machine
             try
             {
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
-                string workpieceStr = string.IsNullOrEmpty(workpiecename) ? "NULL" : "'" + workpiecename + "'";
-                string str = "update rack_administrate set workstate=" + workstate + " where workpiecename=" + workpieceStr;
+                // 真实库 rack_administrate 无 workpiecename 列，工件名存于 rfid（scan 时写入）
+                string workpieceStr = string.IsNullOrEmpty(workpiecename) ? "''" : "'" + workpiecename + "'";
+                string str = "update rack_administrate set workstate=" + workstate + " where rfid=" + workpieceStr;
                 if (Db.ExecuteSql(str))
                     flag = true;
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新料架信息异常: " + ex.Message);
+                LogHelper.Error( "更新料架信息异常: " + ex.Message);
             }
             return flag;
         }
@@ -349,11 +331,11 @@ namespace load_machine
         /// </summary>
         static bool ChangeGripper()
         {
-            Log("INFO", "开始置换夹爪流程...目标类型: " + TargetGripperType);
+            LogHelper.Info( "开始置换夹爪流程...目标类型: " + TargetGripperType);
 
             if (IsFixedGripper)
             {
-                Log("INFO", "固定爪模式，无需置换");
+                LogHelper.Info( "固定爪模式，无需置换");
                 return true;
             }
 
@@ -373,12 +355,12 @@ namespace load_machine
                     }
                 }
             }
-            catch (Exception ex) { Log("ERROR", "读取 robotmessage 失败: " + ex.Message); return false; }
+            catch (Exception ex) { LogHelper.Error( "读取 robotmessage 失败: " + ex.Message); return false; }
 
             // 手上无夹爪 → 直接抓取目标夹爪
             if (curPosStatus == 0)
             {
-                Log("INFO", "手上无夹爪，直接抓取目标夹爪");
+                LogHelper.Info( "手上无夹爪，直接抓取目标夹爪");
                 return PickTargetGripper();
             }
 
@@ -389,22 +371,22 @@ namespace load_machine
                 (curType == "3" && TargetGripperType == "electrode") ||
                 (curType == "4" && TargetGripperType == "pallet"))
             {
-                Log("INFO", "手上已为目标夹爪: " + curName);
+                LogHelper.Info( "手上已为目标夹爪: " + curName);
                 return true;
             }
 
             // 手上有其他快换爪 → 先清空再抓取目标
-            Log("INFO", "手上有夹爪(" + curName + ")，先清空...");
+            LogHelper.Info( "手上有夹爪(" + curName + ")，先清空...");
             bool hasWorkpiece = !string.IsNullOrEmpty(curWorkpiece) && curWorkpiece != "NULL";
 
             if (hasWorkpiece)
             {
                 // 先放工件
                 int emptySlot = GetEmptyRackSlot();
-                if (emptySlot == 0) { Log("ERROR", "无料架空位"); return false; }
+                if (emptySlot == 0) { LogHelper.Error( "无料架空位"); return false; }
                 Plc.WriteDM(PlcDm, emptySlot);
                 SendTaskStart();
-                if (!WaitForTaskFinish(3000)) { Log("ERROR", "放工件超时"); return false; }
+                if (!WaitForTaskFinish(3000)) { LogHelper.Error( "放工件超时"); return false; }
                 try { Mysql.ExecuteSql("UPDATE rack_administrate SET rfid='" + curWorkpiece + "',scanstatus=1,posstatus=2 WHERE id=" + emptySlot); }
                 catch { }
                 ClearRobotWorkpiece();
@@ -421,38 +403,38 @@ namespace load_machine
         static bool ClearCurrentGripper(string gripperType)
         {
             var cur = FindGripperByType(gripperType);
-            if (cur == null) { Log("WARN", "未找到匹配夹爪配置，跳过放置"); return true; }
+            if (cur == null) { LogHelper.Warn( "未找到匹配夹爪配置，跳过放置"); return true; }
             if (!string.IsNullOrEmpty(cur.SlotPhotoSignal) && Plc.ReadWR(cur.SlotPhotoSignal))
-            { Log("ERROR", "夹爪料位有异物"); return false; }
+            { LogHelper.Error( "夹爪料位有异物"); return false; }
             if (!string.IsNullOrEmpty(cur.PlaceTaskNo))
             {
                 int taskNo = ParseTaskNoBase(cur.PlaceTaskNo) + (string.IsNullOrEmpty(cur.Number) ? 0 : int.Parse(cur.Number));
                 Plc.WriteDM(PlcDm, taskNo);
                 SendTaskStart();
-                if (!WaitForTaskFinish(3000)) { Log("ERROR", "放夹爪超时"); return false; }
+                if (!WaitForTaskFinish(3000)) { LogHelper.Error( "放夹爪超时"); return false; }
             }
             ClearRobotClamp();
-            Log("INFO", "当前夹爪已清空");
+            LogHelper.Info( "当前夹爪已清空");
             return true;
         }
 
         static bool PickTargetGripper()
         {
             var target = FindGripperByType(TargetGripperType);
-            if (target == null) { Log("ERROR", "未找到目标夹爪配置"); return false; }
+            if (target == null) { LogHelper.Error( "未找到目标夹爪配置"); return false; }
             if (!string.IsNullOrEmpty(target.SlotPhotoSignal) && !Plc.ReadWR(target.SlotPhotoSignal))
-            { Log("WARN", "目标夹爪料位光电无信号，可能无夹爪"); }
+            { LogHelper.Warn( "目标夹爪料位光电无信号，可能无夹爪"); }
             if (!string.IsNullOrEmpty(target.GrabTaskNo))
             {
                 int taskNo = ParseTaskNoBase(target.GrabTaskNo) + (string.IsNullOrEmpty(target.Number) ? 0 : int.Parse(target.Number));
                 Plc.WriteDM(PlcDm, taskNo);
                 SendTaskStart();
-                if (!WaitForTaskFinish(3000)) { Log("ERROR", "抓夹爪超时"); return false; }
+                if (!WaitForTaskFinish(3000)) { LogHelper.Error( "抓夹爪超时"); return false; }
             }
             // 更新 DB
             try { Mysql.ExecuteSql("UPDATE robotmessage SET clampname='" + target.Name + "',clampstatus=" + (TargetGripperType=="steel"?1:TargetGripperType=="tool"?2:TargetGripperType=="electrode"?3:4) + ",clampposstatus=1,workpiecename=NULL,workpiecestatus=0"); }
             catch { }
-            Log("SUCCESS", "已抓取目标夹爪: " + target.Name);
+            LogHelper.Success( "已抓取目标夹爪: " + target.Name);
             return true;
         }
 
@@ -476,36 +458,36 @@ namespace load_machine
             if (!string.IsNullOrEmpty(TaskStartAddr))
             {
                 Plc.WriteWR(TaskStartAddr, 0);
-                Log("INFO", "复位任务开始信号: " + TaskStartAddr);
+                LogHelper.Info( "复位任务开始信号: " + TaskStartAddr);
             }
 
             // 2. 写入任务号
             if (!Plc.WriteDM(PlcDm, tasknum))
             {
-                Log("ERROR", "发送任务号失败: " + tasknum);
+                LogHelper.Error( "发送任务号失败: " + tasknum);
                 return false;
             }
-            Log("INFO", "写入任务号 " + tasknum + " 至 DM" + PlcDm);
+            LogHelper.Info( "写入任务号 " + tasknum + " 至 DM" + PlcDm);
 
             // 3. 发送任务开始信号
             if (!string.IsNullOrEmpty(TaskStartAddr))
             {
                 if (!Plc.WriteWR(TaskStartAddr, 1))
                 {
-                    Log("ERROR", "发送任务开始信号失败: " + TaskStartAddr);
+                    LogHelper.Error( "发送任务开始信号失败: " + TaskStartAddr);
                     return false;
                 }
-                Log("INFO", "发送任务开始信号: " + TaskStartAddr);
+                LogHelper.Info( "发送任务开始信号: " + TaskStartAddr);
             }
             else
             {
-                Log("WARN", "未配置任务开始信号，跳过");
+                LogHelper.Warn( "未配置任务开始信号，跳过");
             }
 
             // 4. 等待任务完成信号
             if (!string.IsNullOrEmpty(TaskFinishAddr))
             {
-                Log("INFO", "等待任务完成信号 " + TaskFinishAddr + " = 1...");
+                LogHelper.Info( "等待任务完成信号 " + TaskFinishAddr + " = 1...");
                 int waitCount = 0;
                 while (!Plc.ReadWR(TaskFinishAddr) && waitCount < 3000)
                 {
@@ -515,13 +497,13 @@ namespace load_machine
 
                 if (!Plc.ReadWR(TaskFinishAddr))
                 {
-                    Log("ERROR", "等待任务完成超时，任务: " + tasknum);
+                    LogHelper.Error( "等待任务完成超时，任务: " + tasknum);
                     return false;
                 }
-                Log("INFO", "任务完成信号已收到: " + TaskFinishAddr);
+                LogHelper.Info( "任务完成信号已收到: " + TaskFinishAddr);
             }
 
-            Log("SUCCESS", "执行任务 " + tasknum + " 完成");
+            LogHelper.Success( "执行任务 " + tasknum + " 完成");
             return true;
         }
 
@@ -540,39 +522,86 @@ namespace load_machine
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"更新机床主表状态异常: {ex.Message}");
+                LogHelper.Error( $"更新机床主表状态异常: {ex.Message}");
             }
             return flag;
         }
 
         /// <summary>
-        /// 更新机床工位表（macworkposstatus）
+        /// 更新机床指定工位（macworkposstatus）
         /// </summary>
         /// <param name="macnum">机床编号</param>
+        /// <param name="worknum">工位号</param>
         /// <param name="workpiecename">工件名称</param>
         /// <param name="workpiecestatus">工件状态 0=待加工 1=加工中</param>
-        static bool UpdateMacWorkPosStatus(int macnum, string workpiecename, int workpiecestatus)
+        static bool UpdateMacWorkPosStatus(int macnum, int worknum, string workpiecename, int workpiecestatus)
         {
             bool flag = false;
             try
             {
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
+                string macName = GetMacName(macnum);
                 string nameStr = string.IsNullOrEmpty(workpiecename) ? "NULL" : "'" + workpiecename + "'";
-                // 找到该机床第一个 posstatus=0 的空工位，填入工件
-                string str = $"update macworkposstatus set workpiecename={nameStr}, workpiecestatus={workpiecestatus} " +
-                             $"where id=(select id from (select id from macworkposstatus where machinename='{macnum}' and posstatus=0 limit 1) t) ";
+                // 真实结构: mac_name / worknum / workpiece_name / workpiece_status
+                string str = $"update macworkposstatus set workpiece_name={nameStr}, workpiece_status={workpiecestatus} " +
+                             $"where mac_name='{macName}' and worknum={worknum}";
                 if (Db.ExecuteSql(str))
                     flag = true;
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"更新机床工位表异常: {ex.Message}");
+                LogHelper.Error( $"更新机床工位表异常: {ex.Message}");
             }
             return flag;
         }
 
         /// <summary>
-        /// 获取机床空工位列表（posstatus=0）
+        /// 将该机床所有有件工位更新为指定状态（0=待加工 1=加工中）
+        /// </summary>
+        static bool UpdateMacWorkPosStatusAll(int macnum, int workpiecestatus)
+        {
+            bool flag = false;
+            try
+            {
+                CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
+                string macName = GetMacName(macnum);
+                string str = "update macworkposstatus set workpiece_status=" + workpiecestatus +
+                             " where mac_name='" + macName + "' and workpiece_name is not null and workpiece_name<>''";
+                if (Db.ExecuteSql(str))
+                    flag = true;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error( "更新机床 " + macnum + " 工位状态异常: " + ex.Message);
+            }
+            return flag;
+        }
+
+        /// <summary>
+        /// 获取机床所有有件工位的工件名列表
+        /// </summary>
+        static List<string> GetMacFilledWorkpieces(int macnum)
+        {
+            var list = new List<string>();
+            try
+            {
+                CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
+                string macName = GetMacName(macnum);
+                string str = "select workpiece_name from macworkposstatus where mac_name='" + macName +
+                             "' and workpiece_name is not null and workpiece_name<>''";
+                var dt = Db.ExeForDtl(str);
+                foreach (DataRow r in dt.Rows)
+                    list.Add(r["workpiece_name"].ToString());
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error( "获取机床 " + macnum + " 工件列表异常: " + ex.Message);
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// 获取机床空工位列表（workpiece_name 为空）
         /// </summary>
         static List<int> GetMacEmptyPositions(int macnum)
         {
@@ -580,14 +609,15 @@ namespace load_machine
             try
             {
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
-                string str = $"select worknum from macworkposstatus where machinename='{macnum}' and posstatus=0";
+                string macName = GetMacName(macnum);
+                string str = $"select worknum from macworkposstatus where mac_name='{macName}' and (workpiece_name is null or workpiece_name='')";
                 var dt = Db.ExeForDtl(str);
                 foreach (DataRow r in dt.Rows)
                     list.Add(Convert.ToInt32(r["worknum"]));
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"获取机床空工位异常: {ex.Message}");
+                LogHelper.Error( $"获取机床空工位异常: {ex.Message}");
             }
             return list;
         }
@@ -600,14 +630,15 @@ namespace load_machine
             try
             {
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
-                string str = $"select count(*) as cnt from macworkposstatus where machinename='{macnum}'";
+                string macName = GetMacName(macnum);
+                string str = $"select count(*) as cnt from macworkposstatus where mac_name='{macName}'";
                 var dt = Db.ExeForDtl(str);
                 if (dt.Rows.Count > 0)
                     return Convert.ToInt32(dt.Rows[0]["cnt"]);
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"获取机床总工位数异常: {ex.Message}");
+                LogHelper.Error( $"获取机床总工位数异常: {ex.Message}");
             }
             return 0;
         }
@@ -624,37 +655,59 @@ namespace load_machine
             // 判定是否需要合并程序（总工位>1则需要合并）
             bool needMerge = totalPos > 1;
             if (needMerge)
-                Log("INFO", $"机床 {macnum} 有 {totalPos} 个工位，需合并程序后再上传");
+                LogHelper.Info( $"机床 {macnum} 有 {totalPos} 个工位，需合并程序后再上传");
             else
-                Log("INFO", $"机床 {macnum} 只有1个工位，无需合并，直接上传");
+                LogHelper.Info( $"机床 {macnum} 只有1个工位，无需合并，直接上传");
 
             // 无空工位：仍需上传程序并启动加工
             if (emptyList.Count == 0)
             {
-                Log("INFO", $"机床 {macnum} 无空工位，上传程序并启动加工");
+                LogHelper.Info( $"机床 {macnum} 无空工位，上传程序并启动加工");
             }
             // 有空工位：先更新工位表，再上传
             else
             {
-                Log("INFO", $"机床 {macnum} 有 {emptyList.Count} 个空工位，上传程序并启动加工");
+                LogHelper.Info( $"机床 {macnum} 有 {emptyList.Count} 个空工位，上传程序并启动加工");
             }
 
             // TODO: 将 transferprogram.RunTransferProcess(ip, workpiecename)
             // 替换为实际的合并上传方法（transfer 类需要先实现合并逻辑接口）
             if (!transferprogram.RunTransferProcess(ip, workpiecename))
             {
-                Log("ERROR", $"上传程序到机床 {macnum} 失败！");
+                LogHelper.Error( $"上传程序到机床 {macnum} 失败！");
                 return false;
             }
-            Log("INFO", $"上传程序到机床 {macnum} 成功" + (needMerge ? "（已合并）" : ""));
+            LogHelper.Info( $"上传程序到机床 {macnum} 成功" + (needMerge ? "（已合并）" : ""));
 
             // 启动加工
-            if (!MacStartProcessSafe(macnum))
+            bool started = false;
+            bool isSiemens = MachineConfigs.ContainsKey(macnum) &&
+                             MachineConfigs[macnum].ContainsKey("type") &&
+                             MachineConfigs[macnum]["type"] == "siemense";
+            if (isSiemens && MachineStartTaskNo > 0)
             {
-                Log("ERROR", $"启动机床 {macnum} 加工失败！");
+                // 西门子：通过 PLC 发送启动加工命令（复用机器人任务通道 ExecuteTask）
+                if (string.IsNullOrEmpty(TaskStartAddr))
+                {
+                    LogHelper.Error( "PLC 启动加工未配置任务开始信号(taskStart)，无法发送启动命令！");
+                    started = false;
+                }
+                else
+                {
+                    LogHelper.Info( $"西门子机床 {macnum} 通过 PLC 发送启动加工命令(任务号 {MachineStartTaskNo})");
+                    started = ExecuteTask(MachineStartTaskNo);
+                }
+            }
+            else
+            {
+                started = MacStartProcessSafe(macnum);
+            }
+            if (!started)
+            {
+                LogHelper.Error( $"启动机床 {macnum} 加工失败！");
                 return false;
             }
-            Log("INFO", $"机床 {macnum} 启动加工成功！");
+            LogHelper.Info( $"机床 {macnum} 启动加工成功！");
             return true;
         }
 
@@ -700,6 +753,11 @@ namespace load_machine
                         TaskFinishAddr = GetStr(robotSig, "taskDone", "");
                         RobotEleAddr   = GetStr(robotSig, "photo", "");
 
+                        // 西门子启动加工：plc.signals.machine.startTaskNo（经 PLC 发命令）
+                        var machineSig = GetDict(signals, "machine");
+                        if (machineSig.ContainsKey("startTaskNo"))
+                            int.TryParse(machineSig["startTaskNo"].ToString().Replace("D","").Replace("DM","").Trim(), out MachineStartTaskNo);
+
                         // 兜底：旧格式 addresses
                         var addrs = GetDict(plcCfg, "addresses");
                         if (string.IsNullOrEmpty(TaskFinishAddr) && addrs.ContainsKey("task_finish"))
@@ -728,7 +786,7 @@ namespace load_machine
             }
             catch (Exception ex)
             {
-                Log("WARN", "加载配置失败，使用默认配置: " + ex.Message);
+                LogHelper.Warn( "加载配置失败，使用默认配置: " + ex.Message);
             }
         }
 
@@ -791,16 +849,16 @@ namespace load_machine
 
                 if (Db.ExecuteSql(sql))
                 {
-                    Log("INFO", $"更新robotmessage表成功: clampname={clampName}, clampstatus={clampStatus}, clampposstatus={clampPosStatus}, workpiecename={workpieceName}, workpiecestatus={workpieceStatus}");
+                    LogHelper.Info( $"更新robotmessage表成功: clampname={clampName}, clampstatus={clampStatus}, clampposstatus={clampPosStatus}, workpiecename={workpieceName}, workpiecestatus={workpieceStatus}");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败");
+                    LogHelper.Error( "更新robotmessage表失败");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -821,16 +879,16 @@ namespace load_machine
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
                 if (Db.ExecuteSql(sql))
                 {
-                    Log("INFO", "更新robotmessage表成功 - 抓取夹爪: clampposstatus=1, workpiecename=NULL, workpiecestatus=0");
+                    LogHelper.Info( "更新robotmessage表成功 - 抓取夹爪: clampposstatus=1, workpiecename=NULL, workpiecestatus=0");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 抓取夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 抓取夹爪");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -870,18 +928,78 @@ namespace load_machine
         }
 
         /// <summary>
-        /// 判断机床上是否已有工件（加工完成等待换料）
+        /// 机床编号 → 机床名称（macmessage.machinename，与 macworkposstatus.mac_name 一致）
         /// </summary>
-        static bool MachineHasPiece(int macnum)
+        static readonly Dictionary<int, string> MacNameCache = new Dictionary<int, string>();
+        static string GetMacName(int macnum)
         {
+            lock (MacNameCache)
+            {
+                if (MacNameCache.ContainsKey(macnum))
+                    return MacNameCache[macnum];
+            }
             try
             {
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
-                string str = "select COUNT(*) from macmessage where id=" + macnum + " and workpiecename IS NOT NULL and workpiecename != ''";
-                object val = Db.GetValue(str);
-                return val != null && Convert.ToInt32(val) > 0;
+                object val = Db.GetValue("select machinename from macmessage where id=" + macnum);
+                if (val != null && val != DBNull.Value && !string.IsNullOrEmpty(val.ToString()))
+                {
+                    lock (MacNameCache) { MacNameCache[macnum] = val.ToString(); }
+                    return val.ToString();
+                }
             }
-            catch { return false; }
+            catch (Exception ex) { LogHelper.Error( $"获取机床 {macnum} 名称异常: {ex.Message}"); }
+            return macnum.ToString();
+        }
+
+        /// <summary>
+        /// 确保 macworkposstatus 中存在该机床的工位行（按配置 stationCount 补齐缺失行）
+        /// </summary>
+        static void EnsureMacWorkPosRows(int macnum)
+        {
+            try
+            {
+                string macName = GetMacName(macnum);
+                CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
+                object cnt = Db.GetValue($"select count(*) from macworkposstatus where mac_name='{macName}'");
+                int existing = cnt == null || cnt == DBNull.Value ? 0 : Convert.ToInt32(cnt);
+                if (existing > 0) return;
+                int stationCount = 1;
+                if (MachineConfigs.ContainsKey(macnum) && MachineConfigs[macnum].ContainsKey("stationCount"))
+                    int.TryParse(MachineConfigs[macnum]["stationCount"], out stationCount);
+                for (int w = 1; w <= stationCount; w++)
+                    Db.ExecuteSql($"insert into macworkposstatus (mac_name, worknum, workpiece_name, workpiece_status) values ('{macName}', {w}, NULL, 0)");
+                LogHelper.Info( $"机床 {macnum} 工位表为空，已按配置补齐 {stationCount} 个工位行");
+            }
+            catch (Exception ex) { LogHelper.Error( $"补齐机床 {macnum} 工位行异常: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// 获取机床第一个空工位号（workpiece_name 为空），无空工位返回 0
+        /// </summary>
+        static int GetMacFirstEmptyWorknum(int macnum)
+        {
+            try
+            {
+                EnsureMacWorkPosRows(macnum);
+                CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
+                string macName = GetMacName(macnum);
+                string str = $"select worknum from macworkposstatus where mac_name='{macName}' and (workpiece_name is null or workpiece_name='') order by worknum limit 1";
+                object val = Db.GetValue(str);
+                if (val != null && val != DBNull.Value)
+                    return Convert.ToInt32(val);
+            }
+            catch (Exception ex) { LogHelper.Error( $"获取机床 {macnum} 空工位异常: {ex.Message}"); }
+            return 0;
+        }
+
+        /// <summary>
+        /// 获取放置工件到机床的任务号
+        /// 规则待定：当前保持现状（返回机床号），确认后只需修改此函数
+        /// </summary>
+        static int GetPlaceTaskNo(int macnum, int worknum)
+        {
+            return macnum;
         }
 
         /// <summary>
@@ -903,7 +1021,7 @@ namespace load_machine
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新机器人手爪信息异常: " + ex.Message);
+                LogHelper.Error( "更新机器人手爪信息异常: " + ex.Message);
             }
             return flag;
         }
@@ -928,16 +1046,16 @@ namespace load_machine
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
                 if (Db.ExecuteSql(sql))
                 {
-                    Log("INFO", $"更新robotmessage表成功 - 置换夹爪: clampname={clampName}, clampstatus={clampStatus}, clampposstatus=1");
+                    LogHelper.Info( $"更新robotmessage表成功 - 置换夹爪: clampname={clampName}, clampstatus={clampStatus}, clampposstatus=1");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 置换夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 置换夹爪");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -959,16 +1077,16 @@ namespace load_machine
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
                 if (Db.ExecuteSql(sql))
                 {
-                    Log("INFO", $"更新robotmessage表成功 - 抓取夹爪: taskId={taskId}, clampposstatus=1, workpiecestatus=0");
+                    LogHelper.Info( $"更新robotmessage表成功 - 抓取夹爪: taskId={taskId}, clampposstatus=1, workpiecestatus=0");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 抓取夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 抓取夹爪");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -989,16 +1107,16 @@ namespace load_machine
                 CommonInterface Db = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
                 if (Db.ExecuteSql(sql))
                 {
-                    Log("INFO", "更新robotmessage表成功 - 放置夹爪: clampname=NULL, clampposstatus=0, workpiecename=NULL, workpiecestatus=0");
+                    LogHelper.Info( "更新robotmessage表成功 - 放置夹爪: clampname=NULL, clampposstatus=0, workpiecename=NULL, workpiecestatus=0");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 放置夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 放置夹爪");
 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -1039,13 +1157,13 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                 MachineConfigs.Clear();
                 if (!File.Exists(ConfigPath))
                 {
-                    Log("WARN", "配置文件不存在，跳过机床初始化: " + ConfigPath);
+                    LogHelper.Warn( "配置文件不存在，跳过机床初始化: " + ConfigPath);
                     return;
                 }
                 var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
                 if (!cfg.ContainsKey("machines"))
                 {
-                    Log("WARN", "配置文件中没有 machines 节点，跳过机床初始化");
+                    LogHelper.Warn( "配置文件中没有 machines 节点，跳过机床初始化");
                     return;
                 }
                 var machinesRaw = cfg["machines"];
@@ -1069,7 +1187,8 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                     string sessionUrl = m.ContainsKey("sessionUrl") ? m["sessionUrl"].ToString() : "";
                     string username = m.ContainsKey("username") ? m["username"].ToString() : "";
                     string password = m.ContainsKey("password") ? m["password"].ToString() : "";
-                    MachineConfigs[macId] = new Dictionary<string, string>() { { "type", typeStr }, { "ip", ip }, { "ncPath", ncPath } };
+                    string stationCount = m.ContainsKey("stationCount") ? m["stationCount"].ToString() : "1";
+                    MachineConfigs[macId] = new Dictionary<string, string>() { { "type", typeStr }, { "ip", ip }, { "ncPath", ncPath }, { "stationCount", stationCount } };
 
                     MacCommunicate.Macfactory.MacType macType;
                     switch (typeStr)
@@ -1083,18 +1202,18 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                     if (mac != null)
                     {
                         MacList[macId] = mac;
-                        Log("INFO", $"机床 {macId} ({typeStr}) 已创建实例，IP: {ip}" + (string.IsNullOrEmpty(sessionUrl) ? "" : $"，会话: {sessionUrl}"));
+                        LogHelper.Info( $"机床 {macId} ({typeStr}) 已创建实例，IP: {ip}" + (string.IsNullOrEmpty(sessionUrl) ? "" : $"，会话: {sessionUrl}"));
                     }
                     else
                     {
-                        Log("ERROR", $"机床 {macId} 类型 {typeStr} 创建实例失败");
+                        LogHelper.Error( $"机床 {macId} 类型 {typeStr} 创建实例失败");
                     }
                 }
-                Log("INFO", $"机床通讯初始化完成，共 {MacList.Count} 台");
+                LogHelper.Info( $"机床通讯初始化完成，共 {MacList.Count} 台");
             }
             catch (Exception ex)
             {
-                Log("ERROR", "InitMachines 异常: " + ex.Message);
+                LogHelper.Error( "InitMachines 异常: " + ex.Message);
             }
         }
 
@@ -1110,7 +1229,7 @@ ON DUPLICATE KEY UPDATE {updateSet}";
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"获取机床 {macId} 状态异常: {ex.Message}");
+                LogHelper.Error( $"获取机床 {macId} 状态异常: {ex.Message}");
             }
             return null;
         }
@@ -1127,7 +1246,7 @@ ON DUPLICATE KEY UPDATE {updateSet}";
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"启动机床 {macId} 加工异常: {ex.Message}");
+                LogHelper.Error( $"启动机床 {macId} 加工异常: {ex.Message}");
             }
             return false;
         }
@@ -1142,27 +1261,27 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                 MachineConfigs[macId]["type"] != "roders")
                 return true; // 非roders无需开门
 
-            Log("INFO", "机床" + macId + " 为roders，准备连接并开门");
+            LogHelper.Info( "机床" + macId + " 为roders，准备连接并开门");
 
             // 1. 获取机床通讯实例并连接（创建TCP服务器:20200，等待机床主动连接）
             if (!MacList.ContainsKey(macId) || MacList[macId] == null)
             {
-                Log("ERROR", "机床" + macId + " 通讯实例不存在");
+                LogHelper.Error( "机床" + macId + " 通讯实例不存在");
                 return false;
             }
             if (!MacList[macId].ConnectMac())
             {
-                Log("ERROR", "机床" + macId + " 连接失败（TCP服务器创建或机床未连接）");
+                LogHelper.Error( "机床" + macId + " 连接失败（TCP服务器创建或机床未连接）");
                 return false;
             }
-            Log("INFO", "机床" + macId + " 已连接");
+            LogHelper.Info( "机床" + macId + " 已连接");
 
             // 2. 检查机床状态为空闲("reset")时才允许开门
             string status = MacList[macId].GetMacStatus();
-            Log("INFO", "机床" + macId + " 当前状态: " + (status ?? "未知"));
+            LogHelper.Info( "机床" + macId + " 当前状态: " + (status ?? "未知"));
             if (status != "reset")
             {
-                Log("WARN", "机床" + macId + " 非空闲状态(" + status + ")，等待变为空闲...");
+                LogHelper.Warn( "机床" + macId + " 非空闲状态(" + status + ")，等待变为空闲...");
                 int wait = 0;
                 while (wait < 300) // 最多等30秒
                 {
@@ -1173,19 +1292,19 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                 }
                 if (status != "reset")
                 {
-                    Log("ERROR", "机床" + macId + " 等待空闲超时，当前状态: " + (status ?? "未知"));
+                    LogHelper.Error( "机床" + macId + " 等待空闲超时，当前状态: " + (status ?? "未知"));
                     return false;
                 }
             }
-            Log("INFO", "机床" + macId + " 空闲状态，可以开门");
+            LogHelper.Info( "机床" + macId + " 空闲状态，可以开门");
 
             // 3. 开门
             if (!MacList[macId].OpenDoor(macId))
             {
-                Log("ERROR", "机床" + macId + " 开门失败");
+                LogHelper.Error( "机床" + macId + " 开门失败");
                 return false;
             }
-            Log("INFO", "机床" + macId + " 门已打开");
+            LogHelper.Info( "机床" + macId + " 门已打开");
             return true;
         }
 
@@ -1198,12 +1317,12 @@ ON DUPLICATE KEY UPDATE {updateSet}";
             {
                 if (MacList.ContainsKey(macId) && MacList[macId] != null)
                     return MacList[macId].OpenDoor(macId);
-                Log("WARN", $"机床 {macId} 不在MacList中，无法开门");
+                LogHelper.Warn( $"机床 {macId} 不在MacList中，无法开门");
                 return false;
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"机床 {macId} 开门异常: {ex.Message}");
+                LogHelper.Error( $"机床 {macId} 开门异常: {ex.Message}");
                 return false;
             }
         }
@@ -1217,12 +1336,12 @@ ON DUPLICATE KEY UPDATE {updateSet}";
             {
                 if (MacList.ContainsKey(macId) && MacList[macId] != null)
                     return MacList[macId].closeDoor(macId);
-                Log("WARN", $"机床 {macId} 不在MacList中，无法关门");
+                LogHelper.Warn( $"机床 {macId} 不在MacList中，无法关门");
                 return false;
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"机床 {macId} 关门异常: {ex.Message}");
+                LogHelper.Error( $"机床 {macId} 关门异常: {ex.Message}");
                 return false;
             }
         }
@@ -1237,10 +1356,10 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                 MachineConfigs[macId]["type"] != "roders")
                 return true; // 非roders无需关门
 
-            Log("INFO", "机床" + macId + " 为roders，放置工件完成后关门");
+            LogHelper.Info( "机床" + macId + " 为roders，放置工件完成后关门");
             if (!MacCloseDoor(macId))
             {
-                Log("WARN", "机床" + macId + " 关门失败，但不影响流程继续");
+                LogHelper.Warn( "机床" + macId + " 关门失败，但不影响流程继续");
             }
             return true;
         }
@@ -1249,26 +1368,6 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         /// 更新UI界面日志
         /// </summary>
         /// <param name="level"></param>
-        /// <param name="content">日志内容</param>
-        static void Log(string level, string content)
-        {
-            string msg = "[" + level + "] " + content;
-            Console.WriteLine(msg);
-
-            try
-            {
-                var body = Js.Serialize(new { step = StepName, displayName = DisplayName, level, content = msg });
-                var bytes = Encoding.UTF8.GetBytes(body);
-                var req = WebRequest.CreateHttp(ApiBase + "/api/sub/log");
-                req.Method = "POST";
-                req.ContentType = "application/json";
-                req.Timeout = 3000;
-                using (var rs = req.GetRequestStream())
-                    rs.Write(bytes, 0, bytes.Length);
-                try { req.GetResponse().Close(); } catch { }
-            }
-            catch { }
-        }
 
         static string SafeStr(object val) => val == null || val == DBNull.Value ? "" : val.ToString();
         static int SafeInt(object val) => val == null || val == DBNull.Value ? 0 : Convert.ToInt32(val);
@@ -1282,3 +1381,6 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         static void AddGripperConfig(object item) { var g = item as Dictionary<string,object>; if (g==null) return; Grippers.Add(new GripperConfig{Id=GetStr(g,"id",""),Type=GetStr(g,"type","steel"),Name=GetStr(g,"name",""),Number=GetStr(g,"number",""),SlotPhotoSignal=GetStr(g,"slotPhotoSignal",""),GrabTaskNo=GetStr(g,"grabTaskNo",""),PlaceTaskNo=GetStr(g,"placeTaskNo","")}); }
     }
 }
+
+
+

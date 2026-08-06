@@ -53,8 +53,8 @@ namespace change_machine
         public bool RunTransferProcess(string ip, string workpiecename)
         {
             bool flag = false;
-            Log("INFO", "开始执行传输程序流程...");
-            Log("INFO", $"获取到待上传工件: {workpiecename}");
+            LogHelper.Info( "开始执行传输程序流程...");
+            LogHelper.Info( $"获取到待上传工件: {workpiecename}");
 
             // 从共享服务器搜索名称为"工件名称后缀.nc"的文件
             string ncFileName = workpiecename + ".nc";
@@ -62,12 +62,12 @@ namespace change_machine
             string localFilePath = Path.Combine(LocalTempPath, ncFileName);
             string machineFilePath = Path.Combine(MachineNcPath, ncFileName);
 
-            Log("INFO", $"共享服务器文件路径: {shareFilePath}");
+            LogHelper.Info( $"共享服务器文件路径: {shareFilePath}");
 
             // 检查共享服务器文件是否存在
             if (!File.Exists(shareFilePath))
             {
-                Log("ERROR", $"共享服务器文件不存在: {shareFilePath}");
+                LogHelper.Error( $"共享服务器文件不存在: {shareFilePath}");
                 return false;
             }
 
@@ -75,11 +75,11 @@ namespace change_machine
             try
             {
                 File.Copy(shareFilePath, localFilePath, true);
-                Log("INFO", $"文件已复制到本地: {localFilePath}");
+                LogHelper.Info( $"文件已复制到本地: {localFilePath}");
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"复制文件到本地失败: {ex.Message}");
+                LogHelper.Error( $"复制文件到本地失败: {ex.Message}");
             }
 
             // 复制成功后用文件流复制到机床指定路径
@@ -115,22 +115,22 @@ namespace change_machine
                 if (File.Exists(machineFileFullPath))
                 {
                     flag = true;
-                    Log("INFO", $"文件已复制到机床: {machineFileFullPath}");
+                    LogHelper.Info( $"文件已复制到机床: {machineFileFullPath}");
                 }
                 else
                 {
                     flag = false;
-                    Log("ERROR", $"复制文件到机床失败");
+                    LogHelper.Error( $"复制文件到机床失败");
                 }
             }
             catch (Exception ex)
             {
                 flag = false;
-                Log("ERROR", $"复制文件到机床失败: {ex.Message}");
+                LogHelper.Error( $"复制文件到机床失败: {ex.Message}");
                 // 即使复制到机床失败，本地文件已存在，可以手动上传
             }
 
-            Log("INFO", "传输程序流程结束");
+            LogHelper.Info( "传输程序流程结束");
             return flag;
         }
 
@@ -149,17 +149,17 @@ namespace change_machine
 
                 if (result)
                 {
-                    Log("INFO", $"更新工件 {workpieceName} 的workstate为 {workstate} 成功");
+                    LogHelper.Info( $"更新工件 {workpieceName} 的workstate为 {workstate} 成功");
                 }
                 else
                 {
-                    Log("ERROR", $"更新工件 {workpieceName} 的workstate失败");
+                    LogHelper.Error( $"更新工件 {workpieceName} 的workstate失败");
                 }
                 return result;
             }
             catch (Exception ex)
             {
-                Log("ERROR", $"更新工件状态异常: {ex.Message}");
+                LogHelper.Error( $"更新工件状态异常: {ex.Message}");
                 return false;
             }
         }
@@ -197,7 +197,7 @@ namespace change_machine
             }
             catch (Exception ex)
             {
-                Log("WARN", "加载配置失败，使用默认配置: " + ex.Message);
+                LogHelper.Warn( "加载配置失败，使用默认配置: " + ex.Message);
             }
         }
 
@@ -205,26 +205,6 @@ namespace change_machine
         /// 更新UI界面日志
         /// </summary>
         /// <param name="level"></param>
-        /// <param name="content">日志内容</param>
-        static void Log(string level, string content)
-        {
-            string msg = "[" + level + "] " + content;
-            Console.WriteLine(msg);
-
-            try
-            {
-                var body = Js.Serialize(new { step = StepName, displayName = DisplayName, level, content = msg });
-                var bytes = Encoding.UTF8.GetBytes(body);
-                var req = WebRequest.CreateHttp(ApiBase + "/api/sub/log");
-                req.Method = "POST";
-                req.ContentType = "application/json";
-                req.Timeout = 3000;
-                using (var rs = req.GetRequestStream())
-                    rs.Write(bytes, 0, bytes.Length);
-                try { req.GetResponse().Close(); } catch { }
-            }
-            catch { }
-        }
 
         /// <summary>
         /// 读取 Excel(.xlsx) 指定单元格内容

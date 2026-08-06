@@ -47,7 +47,7 @@ namespace change_knife
 
         static void Main(string[] args)
         {
-            Log("INFO", "【" + DisplayName + "】分包启动");
+            LogHelper.Info( "【" + DisplayName + "】分包启动");
 
             try
             {
@@ -59,23 +59,23 @@ namespace change_knife
                 var plc = new plc();
                 if (!plc.Connect(PlcIp, PlcPort))
                 {
-                    Log("ERROR", "PLC 连接失败: " + PlcIp + ":" + PlcPort);
+                    LogHelper.Error( "PLC 连接失败: " + PlcIp + ":" + PlcPort);
                     return;
                 }
-                Log("INFO", "PLC 连接成功: " + PlcIp);
+                LogHelper.Info( "PLC 连接成功: " + PlcIp);
 
                 // 刀库旋转：依次旋转1~10号刀
                 for (int t = 1; t <= 10; t++)
                     RunMC1Magazine(plc, t);
 
-                Log("SUCCESS", "刀库旋转完成");
+                LogHelper.Success( "刀库旋转完成");
             }
             catch (Exception ex)
             {
-                Log("ERROR", "执行异常: " + ex.Message);
+                LogHelper.Error( "执行异常: " + ex.Message);
             }
 
-            Log("INFO", "【" + DisplayName + "】分包结束");
+            LogHelper.Info( "【" + DisplayName + "】分包结束");
         }
 
         static void LoadConfig()
@@ -106,7 +106,7 @@ namespace change_knife
                     PlcPort = GetInt(plccfg, "port", PlcPort);
                 }
             }
-            catch (Exception ex) { Log("WARN", "加载配置失败: " + ex.Message); }
+            catch (Exception ex) { LogHelper.Warn( "加载配置失败: " + ex.Message); }
         }
 
         // ==================== MC1刀库旋转控制 ====================
@@ -115,41 +115,25 @@ namespace change_knife
         /// </summary>
         static bool RunMC1Magazine(plc plc, int toolNo)
         {
-            Log("INFO", "【MC1刀库】检查门关闭信号 " + MC1DoorClosed);
+            LogHelper.Info( "【MC1刀库】检查门关闭信号 " + MC1DoorClosed);
             if (plc.ReadWR(MC1DoorClosed))
             {
-                Log("WARN", "【MC1刀库】刀库门未关闭(信号=1)，旋转失败");
+                LogHelper.Warn( "【MC1刀库】刀库门未关闭(信号=1)，旋转失败");
                 return false;
             }
             plc.WriteWR(MC1RotateStart, 0);
-            Log("INFO", "【MC1刀库】旋转至 " + toolNo + " 号刀");
+            LogHelper.Info( "【MC1刀库】旋转至 " + toolNo + " 号刀");
             plc.WriteDM(MC1TaskDM, toolNo);
             plc.WriteWR(MC1RotateStart, 1);
 
-            Log("INFO", "【MC1刀库】等待转到位信号 " + MC1RotateDone);
+            LogHelper.Info( "【MC1刀库】等待转到位信号 " + MC1RotateDone);
             while (!plc.ReadWR(MC1RotateDone))
                 Thread.Sleep(200);
             plc.WriteWR(MC1RotateStart, 0);
-            Log("SUCCESS", "【MC1刀库】" + toolNo + " 号刀旋转到位");
+            LogHelper.Success( "【MC1刀库】" + toolNo + " 号刀旋转到位");
             return true;
         }
 
-        // ==================== 日志 ====================
-        static void Log(string level, string content)
-        {
-            string msg = "[" + level + "] " + content;
-            Console.WriteLine(msg);
-            try
-            {
-                var body = Js.Serialize(new { step = StepName, displayName = DisplayName, level, content = msg });
-                var bytes = Encoding.UTF8.GetBytes(body);
-                var req = WebRequest.CreateHttp(ApiBase + "/api/sub/log");
-                req.Method = "POST"; req.ContentType = "application/json"; req.Timeout = 3000;
-                using (var rs = req.GetRequestStream()) rs.Write(bytes, 0, bytes.Length);
-                try { req.GetResponse().Close(); } catch { }
-            }
-            catch { }
-        }
 
         // ==================== 辅助 ====================
         static Dictionary<string, object> GetDict(Dictionary<string, object> d, string key)

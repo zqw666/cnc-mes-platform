@@ -132,7 +132,7 @@ namespace prepare_material
                         string epwd = GetStr(eman, "password", "19830617");
                         EmanConnStr = $"Server={ehost},{eport};Database={edb};User Id={euser};Password={epwd};";
                         EmanEnabled = true;
-                        Log("INFO", "Eman数据库已配置: " + ehost);
+                        LogHelper.Info( "Eman数据库已配置: " + ehost);
                     }
 
                     // NC 服务器配置
@@ -145,7 +145,7 @@ namespace prepare_material
                         ProcessCardCell = GetStr(ncs, "process_card_nc_cell", "A1");
                         if (!string.IsNullOrEmpty(NcLocalTemp) && !Directory.Exists(NcLocalTemp))
                             Directory.CreateDirectory(NcLocalTemp);
-                        Log("INFO", "NC服务器配置: root=" + NcServerRoot + " local=" + NcLocalTemp);
+                        LogHelper.Info( "NC服务器配置: root=" + NcServerRoot + " local=" + NcLocalTemp);
                     }
 
                     // PLC 配置
@@ -195,7 +195,7 @@ namespace prepare_material
             }
             catch (Exception ex)
             {
-                Log("WARN", "加载配置失败，使用默认配置: " + ex.Message);
+                LogHelper.Warn( "加载配置失败，使用默认配置: " + ex.Message);
             }
         }
 
@@ -242,25 +242,26 @@ namespace prepare_material
 
         static void Main(string[] args)
         {
-            Log("INFO", "【" + DisplayName + "】分包启动");
+            LogHelper.Info( "【" + DisplayName + "】分包启动");
             try
             {
                 LoadConfig();
                 InitMachines();
+                LogHelper.Configure(StepName, DisplayName, ApiBase);
                 Mysql = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
                 Plc = new plc();
                 if (!Plc.Connect(PlcIp, PlcPort))
                 {
-                    Log("ERROR", "PLC 连接失败: " + PlcIp);
+                    LogHelper.Error( "PLC 连接失败: " + PlcIp);
                     return;
                 }
-                Log("INFO", "PLC 连接成功");
+                LogHelper.Info( "PLC 连接成功");
 
                 List<int> waitmaclist = Waitmaclist();
 
                 if (waitmaclist.Count == 0)
                 {
-                    Log("INFO", "无待加工料位，备料流程结束");
+                    LogHelper.Info( "无待加工料位，备料流程结束");
                     return;
                 }
 
@@ -271,20 +272,20 @@ namespace prepare_material
                     followkonglist = FollowKongWeiList();
                     if (followkonglist.Count == 0)
                     {
-                        Log("INFO", "有随行台但无空位，备料流程结束");
+                        LogHelper.Info( "有随行台但无空位，备料流程结束");
                         return;
                     }
-                    Log("INFO", "随行台空位数: " + followkonglist.Count);
+                    LogHelper.Info( "随行台空位数: " + followkonglist.Count);
                 }
                 else
                 {
-                    Log("INFO", "未配置随行台，仅执行抓取→结束");
+                    LogHelper.Info( "未配置随行台，仅执行抓取→结束");
                 }
 
                 // 1. 执行置换夹爪流程
                 if (!ChangeGripper())
                 {
-                    Log("ERROR", "置换夹爪失败，退出备料流程");
+                    LogHelper.Error( "置换夹爪失败，退出备料流程");
                     return;
                 }
 
@@ -308,32 +309,32 @@ namespace prepare_material
                             string rackType = GetRackTypeByPos(rackpos);
                             if (!string.IsNullOrEmpty(rfid) && !DownloadNCProgram(rfid, rackType))
                             {
-                                Log("ERROR", "NC程序下载失败，备料流程终止！");
+                                LogHelper.Error( "NC程序下载失败，备料流程终止！");
                                 ProcessTermination = true;
                                 break;
                             }
                             if (!ExecuteTask(rackpos))
                             {
-                                Log("ERROR", "机器人执行" + rackpos + "料位抓取任务失败，备料流程终止！");
+                                LogHelper.Error( "机器人执行" + rackpos + "料位抓取任务失败，备料流程终止！");
                                 ProcessTermination = true;
                                 break;
                             }
                             if (!Updaterobotmessage(workpiecename, 2))
-                                Log("ERROR", "更新机器人夹爪信息失败！");
+                                LogHelper.Error( "更新机器人夹爪信息失败！");
                             if (!Updaterack_administrate(rackpos, null, 1))
-                                Log("ERROR", "更新料架信息失败！");
+                                LogHelper.Error( "更新料架信息失败！");
 
                             int followpos = followkonglist[j];
                             if (!ExecuteTask(followpos))
                             {
-                                Log("ERROR", "机器人执行" + followpos + "料位放置任务失败，备料流程终止！");
+                                LogHelper.Error( "机器人执行" + followpos + "料位放置任务失败，备料流程终止！");
                                 ProcessTermination = true;
                                 break;
                             }
                             if (!Updatefollowing_Rack(rackpos, workpiecename, 2))
-                                Log("ERROR", "更新随行台料位信息失败！");
+                                LogHelper.Error( "更新随行台料位信息失败！");
                             if (Updaterobotmessage(null, 1))
-                                Log("ERROR", "更新机器人夹爪信息失败！");
+                                LogHelper.Error( "更新机器人夹爪信息失败！");
                         }
                     }
                 }
@@ -343,33 +344,33 @@ namespace prepare_material
                     List<string> message = GetFirstWaitProcessPieceMessage();
                     int rackpos = Convert.ToInt16(message[0]);
                     string workpiecename = message[1];
-                    Log("INFO", "待加工料位: " + rackpos + " 工件: " + workpiecename);
+                    LogHelper.Info( "待加工料位: " + rackpos + " 工件: " + workpiecename);
 
                     // NC 程序下载
                     string rfid = GetRackRfid(rackpos);
                     string rackType = GetRackTypeByPos(rackpos);
                     if (!string.IsNullOrEmpty(rfid) && !DownloadNCProgram(rfid, rackType))
                     {
-                        Log("ERROR", "NC程序下载失败，备料流程终止！");
+                        LogHelper.Error( "NC程序下载失败，备料流程终止！");
                         return;
                     }
 
                     // 抓取
                     if (!ExecuteTask(rackpos))
                     {
-                        Log("ERROR", "机器人执行" + rackpos + "料位抓取任务失败，备料流程终止！");
+                        LogHelper.Error( "机器人执行" + rackpos + "料位抓取任务失败，备料流程终止！");
                         return;
                     }
-                    Log("INFO", "机器人执行" + rackpos + "料位抓取任务成功！");
+                    LogHelper.Info( "机器人执行" + rackpos + "料位抓取任务成功！");
 
                     if (!Updaterobotmessage(workpiecename, 2))
-                        Log("ERROR", "更新机器人夹爪信息失败！");
+                        LogHelper.Error( "更新机器人夹爪信息失败！");
                     if (!Updaterack_administrate(rackpos, workpiecename, 1))
-                        Log("ERROR", "更新料架" + rackpos + "料位信息失败！");
+                        LogHelper.Error( "更新料架" + rackpos + "料位信息失败！");
 
-                    Log("SUCCESS", "备料流程完成（无随行台）");
+                    LogHelper.Success( "备料流程完成（无随行台）");
                 }
-                Log("INFO", "【" + DisplayName + "】分包结束");
+                LogHelper.Info( "【" + DisplayName + "】分包结束");
             }
             catch(Exception ex)
             { }
@@ -386,36 +387,36 @@ namespace prepare_material
             if (!string.IsNullOrEmpty(TaskStartAddr))
             {
                 Plc.WriteWR(TaskStartAddr, 0);
-                Log("INFO", "复位任务开始信号: " + TaskStartAddr);
+                LogHelper.Info( "复位任务开始信号: " + TaskStartAddr);
             }
 
             // 2. 写入任务号
             if (!Plc.WriteDM(PlcDm, tasknum))
             {
-                Log("ERROR", "发送任务号失败: " + tasknum);
+                LogHelper.Error( "发送任务号失败: " + tasknum);
                 return false;
             }
-            Log("INFO", "写入任务号 " + tasknum + " 至 DM" + PlcDm);
+            LogHelper.Info( "写入任务号 " + tasknum + " 至 DM" + PlcDm);
 
             // 3. 发送任务开始信号
             if (!string.IsNullOrEmpty(TaskStartAddr))
             {
                 if (!Plc.WriteWR(TaskStartAddr, 1))
                 {
-                    Log("ERROR", "发送任务开始信号失败: " + TaskStartAddr);
+                    LogHelper.Error( "发送任务开始信号失败: " + TaskStartAddr);
                     return false;
                 }
-                Log("INFO", "发送任务开始信号: " + TaskStartAddr);
+                LogHelper.Info( "发送任务开始信号: " + TaskStartAddr);
             }
             else
             {
-                Log("WARN", "未配置任务开始信号，跳过");
+                LogHelper.Warn( "未配置任务开始信号，跳过");
             }
 
             // 4. 等待任务完成信号
             if (!string.IsNullOrEmpty(TaskFinishAddr))
             {
-                Log("INFO", "等待任务完成信号 " + TaskFinishAddr + " = 1...");
+                LogHelper.Info( "等待任务完成信号 " + TaskFinishAddr + " = 1...");
                 int waitCount = 0;
                 while (!Plc.ReadWR(TaskFinishAddr) && waitCount < 3000)
                 {
@@ -425,13 +426,13 @@ namespace prepare_material
 
                 if (!Plc.ReadWR(TaskFinishAddr))
                 {
-                    Log("ERROR", "等待任务完成超时，任务: " + tasknum);
+                    LogHelper.Error( "等待任务完成超时，任务: " + tasknum);
                     return false;
                 }
-                Log("INFO", "任务完成信号已收到: " + TaskFinishAddr);
+                LogHelper.Info( "任务完成信号已收到: " + TaskFinishAddr);
             }
 
-            Log("SUCCESS", "执行任务 " + tasknum + " 完成");
+            LogHelper.Success( "执行任务 " + tasknum + " 完成");
             return true;
         }
 
@@ -486,8 +487,8 @@ namespace prepare_material
         /// </summary>
         static bool ChangeGripper()
         {
-            Log("INFO", "开始置换夹爪流程...目标类型: " + TargetGripperType);
-            if (IsFixedGripper) { Log("INFO", "固定爪模式，无需置换"); return true; }
+            LogHelper.Info( "开始置换夹爪流程...目标类型: " + TargetGripperType);
+            if (IsFixedGripper) { LogHelper.Info( "固定爪模式，无需置换"); return true; }
 
             string curName = "", curType = "", curWorkpiece = "";
             int curPosStatus = 0;
@@ -504,26 +505,26 @@ namespace prepare_material
                     }
                 }
             }
-            catch (Exception ex) { Log("ERROR", "读取 robotmessage 失败: " + ex.Message); return false; }
+            catch (Exception ex) { LogHelper.Error( "读取 robotmessage 失败: " + ex.Message); return false; }
 
-            if (curPosStatus == 0) { Log("INFO", "手上无夹爪，直接抓取目标夹爪"); return PickTargetGripper(); }
+            if (curPosStatus == 0) { LogHelper.Info( "手上无夹爪，直接抓取目标夹爪"); return PickTargetGripper(); }
 
             if (string.Equals(curType, TargetGripperType, StringComparison.OrdinalIgnoreCase) ||
                 (curType == "1" && TargetGripperType == "steel") ||
                 (curType == "2" && TargetGripperType == "tool") ||
                 (curType == "3" && TargetGripperType == "electrode") ||
                 (curType == "4" && TargetGripperType == "pallet"))
-            { Log("INFO", "手上已为目标夹爪: " + curName); return true; }
+            { LogHelper.Info( "手上已为目标夹爪: " + curName); return true; }
 
-            Log("INFO", "手上有夹爪(" + curName + ")，先清空...");
+            LogHelper.Info( "手上有夹爪(" + curName + ")，先清空...");
             bool hasWorkpiece = !string.IsNullOrEmpty(curWorkpiece) && curWorkpiece != "NULL";
 
             if (hasWorkpiece)
             {
                 int emptySlot = GetEmptyRackSlot();
-                if (emptySlot == 0) { Log("ERROR", "无料架空位"); return false; }
+                if (emptySlot == 0) { LogHelper.Error( "无料架空位"); return false; }
                 Plc.WriteDM(PlcDm, emptySlot);
-                if (!WaitTask(3000)) { Log("ERROR", "放工件超时"); return false; }
+                if (!WaitTask(3000)) { LogHelper.Error( "放工件超时"); return false; }
                 try { Mysql.ExecuteSql("UPDATE rack_administrate SET rfid='" + curWorkpiece + "',scanstatus=1,posstatus=2 WHERE id=" + emptySlot); }
                 catch { }
                 ClearRobotWorkpiece();
@@ -536,35 +537,35 @@ namespace prepare_material
         static bool ClearCurrentGripper(string gripperType)
         {
             var cur = FindGripperByType(gripperType);
-            if (cur == null) { Log("WARN", "未找到匹配夹爪配置，跳过放置"); return true; }
+            if (cur == null) { LogHelper.Warn( "未找到匹配夹爪配置，跳过放置"); return true; }
             if (!string.IsNullOrEmpty(cur.SlotPhotoSignal) && Plc.ReadWR(cur.SlotPhotoSignal))
-            { Log("ERROR", "夹爪料位有异物"); return false; }
+            { LogHelper.Error( "夹爪料位有异物"); return false; }
             if (!string.IsNullOrEmpty(cur.PlaceTaskNo))
             {
                 int taskNo = ParseTaskNoBase(cur.PlaceTaskNo) + (string.IsNullOrEmpty(cur.Number) ? 0 : int.Parse(cur.Number));
                 Plc.WriteDM(PlcDm, taskNo);
-                if (!WaitTask(3000)) { Log("ERROR", "放夹爪超时"); return false; }
+                if (!WaitTask(3000)) { LogHelper.Error( "放夹爪超时"); return false; }
             }
             ClearRobotClamp();
-            Log("INFO", "当前夹爪已清空");
+            LogHelper.Info( "当前夹爪已清空");
             return true;
         }
 
         static bool PickTargetGripper()
         {
             var target = FindGripperByType(TargetGripperType);
-            if (target == null) { Log("ERROR", "未找到目标夹爪配置"); return false; }
+            if (target == null) { LogHelper.Error( "未找到目标夹爪配置"); return false; }
             if (!string.IsNullOrEmpty(target.SlotPhotoSignal) && !Plc.ReadWR(target.SlotPhotoSignal))
-            { Log("WARN", "目标夹爪料位光电无信号，可能无夹爪"); }
+            { LogHelper.Warn( "目标夹爪料位光电无信号，可能无夹爪"); }
             if (!string.IsNullOrEmpty(target.GrabTaskNo))
             {
                 int taskNo = ParseTaskNoBase(target.GrabTaskNo) + (string.IsNullOrEmpty(target.Number) ? 0 : int.Parse(target.Number));
                 Plc.WriteDM(PlcDm, taskNo);
-                if (!WaitTask(3000)) { Log("ERROR", "抓夹爪超时"); return false; }
+                if (!WaitTask(3000)) { LogHelper.Error( "抓夹爪超时"); return false; }
             }
             try { Mysql.ExecuteSql("UPDATE robotmessage SET clampname='" + target.Name + "',clampstatus=" + (TargetGripperType=="steel"?1:TargetGripperType=="tool"?2:TargetGripperType=="electrode"?3:4) + ",clampposstatus=1,workpiecename=NULL,workpiecestatus=0"); }
             catch { }
-            Log("SUCCESS", "已抓取目标夹爪: " + target.Name);
+            LogHelper.Success( "已抓取目标夹爪: " + target.Name);
             return true;
         }
 
@@ -621,16 +622,16 @@ namespace prepare_material
 
                 if (Mysql.ExecuteSql(sql))
                 {
-                    Log("INFO", $"更新robotmessage表成功 - 置换夹爪: clampname={clampName}, clampstatus={clampStatus}, clampposstatus=1");
+                    LogHelper.Info( $"更新robotmessage表成功 - 置换夹爪: clampname={clampName}, clampstatus={clampStatus}, clampposstatus=1");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 置换夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 置换夹爪");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -652,16 +653,16 @@ namespace prepare_material
 
                 if (Mysql.ExecuteSql(sql))
                 {
-                    Log("INFO", $"更新robotmessage表成功 - 抓取夹爪: taskId={taskId}, clampposstatus=1, workpiecestatus=0");
+                    LogHelper.Info( $"更新robotmessage表成功 - 抓取夹爪: taskId={taskId}, clampposstatus=1, workpiecestatus=0");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 抓取夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 抓取夹爪");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -682,16 +683,16 @@ namespace prepare_material
 
                 if (Mysql.ExecuteSql(sql))
                 {
-                    Log("INFO", "更新robotmessage表成功 - 放置夹爪: clampname=NULL, clampposstatus=0, workpiecename=NULL, workpiecestatus=0");
+                    LogHelper.Info( "更新robotmessage表成功 - 放置夹爪: clampname=NULL, clampposstatus=0, workpiecename=NULL, workpiecestatus=0");
                 }
                 else
                 {
-                    Log("ERROR", "更新robotmessage表失败 - 放置夹爪");
+                    LogHelper.Error( "更新robotmessage表失败 - 放置夹爪");
                 }
             }
             catch (Exception ex)
             {
-                Log("ERROR", "更新robotmessage表异常: " + ex.Message);
+                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
             }
         }
 
@@ -707,19 +708,19 @@ namespace prepare_material
         {
             if (!EmanEnabled || string.IsNullOrEmpty(EmanConnStr))
             {
-                Log("ERROR", "Eman数据库未配置，无法下载NC程序");
+                LogHelper.Error( "Eman数据库未配置，无法下载NC程序");
                 return false;
             }
             if (string.IsNullOrEmpty(NcServerRoot))
             {
-                Log("ERROR", "NC服务器根目录未配置");
+                LogHelper.Error( "NC服务器根目录未配置");
                 return false;
             }
 
             var emanData = QueryEmanProduction(rfid, rackType);
             if (emanData == null)
             {
-                Log("ERROR", "从Eman获取生产数据失败，无法下载NC程序");
+                LogHelper.Error( "从Eman获取生产数据失败，无法下载NC程序");
                 return false;
             }
 
@@ -728,7 +729,7 @@ namespace prepare_material
             else if (rackType == "steel")
                 return DownloadNCForSteel(rfid, emanData);
 
-            Log("WARN", "未知料架类型: " + rackType + "，跳过NC下载");
+            LogHelper.Warn( "未知料架类型: " + rackType + "，跳过NC下载");
             return true;
         }
 
@@ -748,7 +749,7 @@ namespace prepare_material
 
                 if (string.IsNullOrEmpty(elecName))
                 {
-                    Log("ERROR", "Eman数据中缺少电极名称");
+                    LogHelper.Error( "Eman数据中缺少电极名称");
                     return false;
                 }
 
@@ -756,7 +757,7 @@ namespace prepare_material
                 string[] parts = elecName.Split('-');
                 if (parts.Length < 3)
                 {
-                    Log("ERROR", "电极名称格式异常(需3段'-'分隔): " + elecName);
+                    LogHelper.Error( "电极名称格式异常(需3段'-'分隔): " + elecName);
                     return false;
                 }
                 string part1 = parts[0];
@@ -766,13 +767,13 @@ namespace prepare_material
                 // 拼接远程 NC 路径
                 string remoteNcPath = Path.Combine(NcServerRoot, toolingNo, moldNo,
                     part1, part2, "small", part3, elecName + ".nc");
-                Log("INFO", "【电极NC】远程路径: " + remoteNcPath);
+                LogHelper.Info( "【电极NC】远程路径: " + remoteNcPath);
 
                 return DownloadFile(remoteNcPath, elecName + ".nc");
             }
             catch (Exception ex)
             {
-                Log("ERROR", "电极NC下载异常: " + ex.Message);
+                LogHelper.Error( "电极NC下载异常: " + ex.Message);
                 return false;
             }
         }
@@ -788,7 +789,7 @@ namespace prepare_material
                 string cardPath = GetEmanField(emanData, "process_card_path");
                 if (string.IsNullOrEmpty(cardPath))
                 {
-                    Log("ERROR", "Eman数据中缺少工艺卡路径");
+                    LogHelper.Error( "Eman数据中缺少工艺卡路径");
                     return false;
                 }
 
@@ -797,10 +798,10 @@ namespace prepare_material
                 if (string.IsNullOrEmpty(cardFileName))
                     cardFileName = "steel_card_" + rfid + ".txt";
 
-                Log("INFO", "【钢件NC】下载工艺卡: " + cardPath);
+                LogHelper.Info( "【钢件NC】下载工艺卡: " + cardPath);
                 if (!DownloadFile(cardPath, cardFileName))
                 {
-                    Log("ERROR", "下载工艺卡失败: " + cardPath);
+                    LogHelper.Error( "下载工艺卡失败: " + cardPath);
                     return false;
                 }
 
@@ -809,20 +810,20 @@ namespace prepare_material
                 string ncPathLine = ReadExcelCell(localCardPath, ProcessCardCell);
                 if (string.IsNullOrEmpty(ncPathLine))
                 {
-                    Log("ERROR", "工艺卡中未找到NC路径（单元格: " + ProcessCardCell + "）");
+                    LogHelper.Error( "工艺卡中未找到NC路径（单元格: " + ProcessCardCell + "）");
                     return false;
                 }
-                Log("INFO", "【钢件NC】工艺卡NC路径: " + ncPathLine);
+                LogHelper.Info( "【钢件NC】工艺卡NC路径: " + ncPathLine);
 
                 // 3. 下载 NC 程序
                 string ncFileName = Path.GetFileName(ncPathLine);
                 if (string.IsNullOrEmpty(ncFileName))
                     ncFileName = "steel_" + rfid + ".nc";
 
-                Log("INFO", "【钢件NC】下载NC程序: " + ncPathLine);
+                LogHelper.Info( "【钢件NC】下载NC程序: " + ncPathLine);
                 if (!DownloadFile(ncPathLine, ncFileName))
                 {
-                    Log("ERROR", "下载NC程序失败: " + ncPathLine);
+                    LogHelper.Error( "下载NC程序失败: " + ncPathLine);
                     return false;
                 }
 
@@ -830,7 +831,7 @@ namespace prepare_material
             }
             catch (Exception ex)
             {
-                Log("ERROR", "钢件NC下载异常: " + ex.Message);
+                LogHelper.Error( "钢件NC下载异常: " + ex.Message);
                 return false;
             }
         }
@@ -863,7 +864,7 @@ namespace prepare_material
                 else
                     return null;
 
-                Log("INFO", "查询Eman(" + rackType + "): " + rfid);
+                LogHelper.Info( "查询Eman(" + rackType + "): " + rfid);
                 using (DataTable dt = emanDb.ExeForDtl(sql))
                 {
                     if (dt != null && dt.Rows.Count > 0)
@@ -874,9 +875,9 @@ namespace prepare_material
                         return result;
                     }
                 }
-                Log("WARN", "Eman未找到记录: " + rfid);
+                LogHelper.Warn( "Eman未找到记录: " + rfid);
             }
-            catch (Exception ex) { Log("ERROR", "Eman查询失败: " + ex.Message); }
+            catch (Exception ex) { LogHelper.Error( "Eman查询失败: " + ex.Message); }
             return null;
         }
 
@@ -889,18 +890,18 @@ namespace prepare_material
             {
                 if (!File.Exists(remotePath))
                 {
-                    Log("ERROR", "远程文件不存在: " + remotePath);
+                    LogHelper.Error( "远程文件不存在: " + remotePath);
                     return false;
                 }
 
                 string localPath = Path.Combine(NcLocalTemp, fileName);
                 File.Copy(remotePath, localPath, true);
-                Log("SUCCESS", "文件下载成功: " + localPath);
+                LogHelper.Success( "文件下载成功: " + localPath);
                 return File.Exists(localPath);
             }
             catch (Exception ex)
             {
-                Log("ERROR", "文件下载失败: " + ex.Message);
+                LogHelper.Error( "文件下载失败: " + ex.Message);
                 return false;
             }
         }
@@ -918,7 +919,7 @@ namespace prepare_material
             {
                 if (!File.Exists(filePath))
                 {
-                    Log("ERROR", "Excel文件不存在: " + filePath);
+                    LogHelper.Error( "Excel文件不存在: " + filePath);
                     return "";
                 }
 
@@ -974,7 +975,7 @@ namespace prepare_material
             }
             catch (Exception ex)
             {
-                Log("ERROR", "读取Excel单元格失败(" + cellRef + "): " + ex.Message);
+                LogHelper.Error( "读取Excel单元格失败(" + cellRef + "): " + ex.Message);
                 return "";
             }
         }
@@ -1014,9 +1015,9 @@ ON DUPLICATE KEY UPDATE {updateSet}";
             try
             {
                 MachineConfigs.Clear();
-                if (!File.Exists(ConfigPath)) { Log("WARN", "配置文件不存在: " + ConfigPath); return; }
+                if (!File.Exists(ConfigPath)) { LogHelper.Warn( "配置文件不存在: " + ConfigPath); return; }
                 var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
-                if (!cfg.ContainsKey("machines")) { Log("WARN", "配置文件中没有 machines 节点"); return; }
+                if (!cfg.ContainsKey("machines")) { LogHelper.Warn( "配置文件中没有 machines 节点"); return; }
                 var machines = Js.Deserialize<Dictionary<string, object>>(cfg["machines"].ToString());
                 foreach (var kv in machines)
                 {
@@ -1037,12 +1038,12 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                         default: macType = MacCommunicate.Macfactory.MacType.roders; break;
                     }
                     var mac = MacCommunicate.Macfactory.MacFactory.CreateInstance(macType, ip, sessionUrl, username, password);
-                    if (mac != null) { MacList[macId] = mac; Log("INFO", $"机床 {macId} ({typeStr}) 已创建，IP: {ip}" + (string.IsNullOrEmpty(sessionUrl) ? "" : $"，会话: {sessionUrl}")); }
-                    else { Log("ERROR", $"机床 {macId} 创建实例失败"); }
+                    if (mac != null) { MacList[macId] = mac; LogHelper.Info( $"机床 {macId} ({typeStr}) 已创建，IP: {ip}" + (string.IsNullOrEmpty(sessionUrl) ? "" : $"，会话: {sessionUrl}")); }
+                    else { LogHelper.Error( $"机床 {macId} 创建实例失败"); }
                 }
-                Log("INFO", $"机床通讯初始化完成，共 {MacList.Count} 台");
+                LogHelper.Info( $"机床通讯初始化完成，共 {MacList.Count} 台");
             }
-            catch (Exception ex) { Log("ERROR", "InitMachines 异常: " + ex.Message); }
+            catch (Exception ex) { LogHelper.Error( "InitMachines 异常: " + ex.Message); }
         }
 
         /// <summary>
@@ -1051,7 +1052,7 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         static string GetMacStatusSafe(int macId)
         {
             try { if (MacList.ContainsKey(macId) && MacList[macId] != null) return MacList[macId].GetMacStatus(); }
-            catch (Exception ex) { Log("ERROR", $"获取机床 {macId} 状态异常: {ex.Message}"); }
+            catch (Exception ex) { LogHelper.Error( $"获取机床 {macId} 状态异常: {ex.Message}"); }
             return null;
         }
 
@@ -1061,7 +1062,7 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         static bool MacStartProcessSafe(int macId)
         {
             try { if (MacList.ContainsKey(macId) && MacList[macId] != null) return MacList[macId].MacStartProcess(macId); }
-            catch (Exception ex) { Log("ERROR", $"启动机床 {macId} 加工异常: {ex.Message}"); }
+            catch (Exception ex) { LogHelper.Error( $"启动机床 {macId} 加工异常: {ex.Message}"); }
             return false;
         }
 
@@ -1071,7 +1072,7 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         static void MacOpenDoor(int macId)
         {
             try { if (MacList.ContainsKey(macId) && MacList[macId] != null) MacList[macId].OpenDoor(macId); }
-            catch (Exception ex) { Log("ERROR", $"机床 {macId} 开门异常: {ex.Message}"); }
+            catch (Exception ex) { LogHelper.Error( $"机床 {macId} 开门异常: {ex.Message}"); }
         }
 
         /// <summary>
@@ -1080,27 +1081,7 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         static void MacCloseDoor(int macId)
         {
             try { if (MacList.ContainsKey(macId) && MacList[macId] != null) MacList[macId].closeDoor(macId); }
-            catch (Exception ex) { Log("ERROR", $"机床 {macId} 关门异常: {ex.Message}"); }
-        }
-
-        static void Log(string level, string content)
-        {
-            string msg = "[" + level + "] " + content;
-            Console.WriteLine(msg);
-
-            try
-            {
-                var body = Js.Serialize(new { step = StepName, displayName = DisplayName, level, content = msg });
-                var bytes = Encoding.UTF8.GetBytes(body);
-                var req = WebRequest.CreateHttp(ApiBase + "/api/sub/log");
-                req.Method = "POST";
-                req.ContentType = "application/json";
-                req.Timeout = 3000;
-                using (var rs = req.GetRequestStream())
-                    rs.Write(bytes, 0, bytes.Length);
-                try { req.GetResponse().Close(); } catch { }
-            }
-            catch { }
+            catch (Exception ex) { LogHelper.Error( $"机床 {macId} 关门异常: {ex.Message}"); }
         }
 
         /// <summary>
@@ -1192,32 +1173,32 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         // ==================== 转台运动控制 ====================
         static bool RunTurntable(plc plc, int angle)
         {
-            Log("INFO", "【转台】移动至 " + angle + " 度");
+            LogHelper.Info( "【转台】移动至 " + angle + " 度");
             plc.WriteWr(SignalDegree, (ushort)angle);
             plc.WriteWR(SignalAllowMove, 1);
             plc.WriteWR(SignalStartMove, 1);
 
-            Log("INFO", "【转台】等待到位信号 " + SignalMoveDone);
+            LogHelper.Info( "【转台】等待到位信号 " + SignalMoveDone);
             while (!plc.ReadWR(SignalMoveDone))
                 Thread.Sleep(200);
 
             plc.WriteWR(SignalAllowMove, 0);
             plc.WriteWR(SignalStartMove, 0);
-            Log("SUCCESS", "【转台】" + angle + " 度移动完成");
+            LogHelper.Success( "【转台】" + angle + " 度移动完成");
             return true;
         }
 
         static bool TurntableReturnZero(plc plc)
         {
-            Log("INFO", "【转台】回零开始: " + SignalReturnZero);
+            LogHelper.Info( "【转台】回零开始: " + SignalReturnZero);
             plc.WriteWR(SignalReturnZero, 1);
 
-            Log("INFO", "【转台】等待零点信号 " + SignalAtZero);
+            LogHelper.Info( "【转台】等待零点信号 " + SignalAtZero);
             while (!plc.ReadWR(SignalAtZero))
                 Thread.Sleep(200);
 
             plc.WriteWR(SignalReturnZero, 0);
-            Log("SUCCESS", "【转台】已回到零点");
+            LogHelper.Success( "【转台】已回到零点");
             return true;
         }
     }

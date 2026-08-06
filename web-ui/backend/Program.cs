@@ -1444,7 +1444,7 @@ namespace MachineMonitor
                 if (enabledSteps.Count == 0)
                 {
                     Console.WriteLine("[Workflow] 没有启用的流程步骤 (work_flow 和 process_flow 表中均无 status=1 的记录)");
-                    WriteStepLog("workflow", "总流程", "WARN", "没有启用的流程步骤");
+                    LogHelper.Warn("没有启用的流程步骤");
                     return;
                 }
 
@@ -1464,7 +1464,7 @@ namespace MachineMonitor
                     string display = step.DisplayName;
                     Console.WriteLine($"[Workflow] [{stepIndex}/{totalSteps}] 开始执行分包: {display} ({name})");
 
-                    WriteStepLog(name, display, "INFO", $"步骤 [{stepIndex}/{totalSteps}] 开始执行");
+                    LogHelper.Info($"步骤 [{stepIndex}/{totalSteps}] 开始执行");
                     UpdateStepStatus(name, "running", "执行中");
 
                     await RunSubProcess(name, display, ct);
@@ -1474,11 +1474,11 @@ namespace MachineMonitor
 
                     Console.WriteLine($"[Workflow] 完成: {display}");
                     UpdateStepStatus(name, "completed", "执行完成");
-                    WriteStepLog(name, display, "SUCCESS", "步骤执行完成");
+                    LogHelper.Success("步骤执行完成");
                 }
 
                 Console.WriteLine("[Workflow] 所有步骤执行完毕");
-                WriteStepLog("workflow", "总流程", "INFO", "工作流全部步骤执行完毕");
+                LogHelper.Info("工作流全部步骤执行完毕");
             }
             catch (OperationCanceledException)
             {
@@ -1487,7 +1487,7 @@ namespace MachineMonitor
             catch (Exception ex)
             {
                 Console.WriteLine($"[Workflow] 异常: {ex.Message}");
-                WriteStepLog("workflow", "总流程", "ERROR", "工作流异常: " + ex.Message);
+                LogHelper.Error("工作流异常: " + ex.Message);
             }
             finally
             {
@@ -1504,7 +1504,7 @@ namespace MachineMonitor
             if (!File.Exists(exePath))
             {
                 Console.WriteLine($"[SubProcess] [警告] 分包不存在: {exePath}");
-                WriteStepLog(name, displayName, "WARN", $"分包程序不存在: {name}.exe");
+                LogHelper.Warn($"分包程序不存在: {name}.exe");
                 await Task.Delay(1000, ct);
                 return;
             }
@@ -1531,7 +1531,7 @@ namespace MachineMonitor
                         if (!string.IsNullOrEmpty(e.Data))
                         {
                             Console.WriteLine($"  [{name}] {e.Data}");
-                            WriteStepLog(name, displayName, "INFO", e.Data);
+                            LogHelper.Info(e.Data);
                         }
                     };
                     proc.ErrorDataReceived += (s, e) =>
@@ -1539,7 +1539,7 @@ namespace MachineMonitor
                         if (!string.IsNullOrEmpty(e.Data))
                         {
                             Console.WriteLine($"  [{name} ERROR] {e.Data}");
-                            WriteStepLog(name, displayName, "ERROR", e.Data);
+                            LogHelper.Error(e.Data);
                         }
                     };
                     proc.BeginOutputReadLine();
@@ -1562,7 +1562,7 @@ namespace MachineMonitor
             catch (Exception ex)
             {
                 Console.WriteLine($"[错误] 运行分包 {name} 失败: {ex.Message}");
-                WriteStepLog(name, displayName, "ERROR", "分包运行失败: " + ex.Message);
+                LogHelper.Error("分包运行失败: " + ex.Message);
             }
         }
 
