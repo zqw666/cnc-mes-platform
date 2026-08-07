@@ -27,7 +27,13 @@ new Vue({
     logStartTime: '',
     logEndTime: '',
     logTypeFilter: '',
-    logKeyword: ''
+    logKeyword: '',
+    // 任务管理板块
+    taskData: [],
+    taskFilteredData: [],
+    taskCurrentPage: 1,
+    taskFilterTool: '',
+    taskFilterMold: ''
   },
   computed: {
     logPages() {
@@ -36,6 +42,13 @@ new Vue({
     logStartIdx() { return (this.logCurrentPage - 1) * this.LOG_PAGE_SIZE; },
     logPagedData() {
       return this.logFilteredData.slice(this.logStartIdx, this.logStartIdx + this.LOG_PAGE_SIZE);
+    },
+    taskPages() { return Math.max(1, Math.ceil(this.taskFilteredData.length / 50)); },
+    taskStartIdx() { return (this.taskCurrentPage - 1) * 50; },
+    taskPagedData() { return this.taskFilteredData.slice(this.taskStartIdx, this.taskStartIdx + 50); },
+    taskAllCurrentChecked() {
+      var page = this.taskPagedData;
+      return page.length > 0 && page.every(function(r) { return r.selected; });
     },
     isWorkflowRunning() { return this.workflowState === 'running'; },
     isWorkflowPaused() { return this.workflowState === 'paused'; },
@@ -183,6 +196,53 @@ new Vue({
     logGoPage(p) {
       if (p >= 1 && p <= this.logPages) this.logCurrentPage = p;
     },
+    // ==================== 任务管理板块 ====================
+    genTaskDemo() {
+      var self = this;
+      this.taskData = [];
+      for (var i = 1; i <= 137; i++) {
+        this.taskData.push({
+          id: i,
+          monId: 'MON-' + (1000 + i),
+          partName: '零件-' + i,
+          toolNo: i % 10 === 0 ? 'T-100' : 'T-' + (i % 20),
+          mold: 'M-' + (i % 7 + 1),
+          machine: '机台-' + (i % 5 + 1),
+          selected: false
+        });
+      }
+      this.taskFilteredData = this.taskData.slice();
+      this.taskCurrentPage = 1;
+    },
+    applyTaskFilter() {
+      var t = this.taskFilterTool.trim();
+      var m = this.taskFilterMold.trim();
+      var self = this;
+      this.taskFilteredData = this.taskData.filter(function(item) {
+        if (t && !String(item.toolNo).includes(t)) return false;
+        if (m && !String(item.mold).includes(m)) return false;
+        return true;
+      });
+      this.taskCurrentPage = 1;
+    },
+    taskToggleSelect(row) { row.selected = !row.selected; },
+    taskSelectAllClick() {
+      var self = this;
+      this.taskPagedData.forEach(function(d) { d.selected = !self.taskAllCurrentChecked; });
+    },
+    taskSelectAllToggle() {
+      var all = this.taskFilteredData.every(function(x) { return x.selected; });
+      this.taskFilteredData.forEach(function(x) { x.selected = !all; });
+    },
+    topSelectedTasks() {
+      var sel = this.taskFilteredData.filter(function(x) { return x.selected; });
+      var rest = this.taskFilteredData.filter(function(x) { return !x.selected; });
+      this.taskFilteredData = sel.concat(rest);
+      this.taskCurrentPage = 1;
+    },
+    taskGoPage(p) {
+      if (p >= 1 && p <= this.taskPages) this.taskCurrentPage = p;
+    },
     startPolling() {
       this.loadDashboard();
       this.syncWorkflowStatus();
@@ -202,6 +262,7 @@ new Vue({
     this.username = stored || '白晓乾';
     this.startPolling();
     this.loadLogs();
+    this.genTaskDemo();
     this.clockTimer = setInterval(this.updateTime, 1000);
     this.updateTime();
   },

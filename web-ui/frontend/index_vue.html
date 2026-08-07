@@ -114,8 +114,53 @@
       </section>
 
       <!-- ===== 未迁移板块占位 ===== -->
-      <section id="tasks" class="section" :class="{ active: currentSection === 'tasks' }">
-        <div style="display:flex;align-items:center;justify-content:center;height:300px;color:#999;font-size:18px;">板块迁移中 — 任务管理</div>
+            <section id="tasks" class="section" :class="{ active: currentSection === 'tasks' }">
+        <div class="task-toolbar">
+          <div class="filters">
+            <label>工装编号: <input v-model="taskFilterTool" type="text" placeholder="请输入工装编号" @keyup.enter="applyTaskFilter"></label>
+            <label>模号: <input v-model="taskFilterMold" type="text" placeholder="请输入模号" @keyup.enter="applyTaskFilter"></label>
+            <button class="small-btn" @click="applyTaskFilter">查询</button>
+          </div>
+          <div class="actions">
+            <button class="small-btn" @click="topSelectedTasks">置顶选中</button>
+          </div>
+        </div>
+        <div class="task-table-wrap">
+          <table id="task-table" class="task-table">
+            <thead>
+              <tr>
+                <th class="col-select"><input type="checkbox" title="双击全选" :checked="taskAllCurrentChecked" @click="taskSelectAllClick" @dblclick="taskSelectAllToggle"></th>
+                <th class="col-no">序号</th>
+                <th>加工零件监控编号</th>
+                <th>加工零件名称</th>
+                <th>工装编号</th>
+                <th>模号</th>
+                <th>加工机台名称</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, idx) in taskPagedData" :key="row.id">
+                <td class="col-select"><input type="checkbox" :checked="row.selected" @change="taskToggleSelect(row)"></td>
+                <td class="col-no">{{ taskStartIdx + idx + 1 }}</td>
+                <td>{{ row.monId }}</td>
+                <td>{{ row.partName }}</td>
+                <td>{{ row.toolNo }}</td>
+                <td>{{ row.mold }}</td>
+                <td>{{ row.machine }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="task-footer">
+          <div class="pager">
+            <button class="icon-btn" @click="taskGoPage(taskCurrentPage - 1)" :disabled="taskCurrentPage <= 1">◀</button>
+            <div class="page-numbers">
+              <button v-for="p in taskPages" :key="p" :class="{ active: p === taskCurrentPage }" @click="taskGoPage(p)">{{ p }}</button>
+            </div>
+            <button class="icon-btn" @click="taskGoPage(taskCurrentPage + 1)" :disabled="taskCurrentPage >= taskPages">▶</button>
+          </div>
+          <div class="pager-info">每页最多显示 50 行</div>
+        </div>
       </section>
       <section id="shelves" class="section" :class="{ active: currentSection === 'shelves' }">
         <div style="display:flex;align-items:center;justify-content:center;height:300px;color:#999;font-size:18px;">板块迁移中 — 料架管理</div>
