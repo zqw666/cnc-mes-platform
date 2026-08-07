@@ -18,7 +18,7 @@ var tabBtns, tabContents;
 var logTableBody, logStartTime, logEndTime, logLevel, logKeyword, logSearchBtn, logResetBtn, logPrevPage, logNextPage, logPageNumbers, logType, btnLogSearch, btnLogReset;
 var LOG_PAGE_SIZE = 50, LOG_DATA = [], logCurrentPage = 1, logFilteredData = [];
 var lastLogId = 0, LOG_POLL_INTERVAL = 2000;
-var configNavItems, configGroups, btnAddMachine;
+var configNavItems, configGroups, btnAddMachine, btnSaveConfig, btnImportExcel, excelFileInput, btnExportExcel;
 var palletEnabled, palletSlotsField, palletSection, palletSlotsEl, palletInputs, palletSavedValues = {};
 var selectAllCheckbox;
 
@@ -49,6 +49,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ==================== 菜单切换 ====================
+  menuItems = document.querySelectorAll('.menu-item');
+  sections = document.querySelectorAll('.section');
   menuItems.forEach(item => {
     item.addEventListener('click', () => {
       document.querySelector('.menu-item.active')?.classList.remove('active');
@@ -82,6 +84,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   logLevel = document.getElementById('log-level');
   logKeyword = document.getElementById('log-keyword');
   logSearchBtn = document.getElementById('btn-log-search');
+  logPrevPage = document.getElementById('log-prev-page');
+  logNextPage = document.getElementById('log-next-page');
+  logPageNumbers = document.getElementById('log-page-numbers');
   logResetBtn = document.getElementById('btn-log-reset');
   logType = document.getElementById('log-type');
   btnLogSearch = document.getElementById('btn-log-search');
@@ -89,6 +94,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   configNavItems = document.querySelectorAll('.config-nav-item');
   configGroups = document.querySelectorAll('.config-group');
   btnAddMachine = document.getElementById('btn-add-machine');
+  btnSaveConfig = document.getElementById('btn-save-config');
+  btnImportExcel = document.getElementById('btn-import-excel');
+  excelFileInput = document.getElementById('excel-file-input');
+  btnExportExcel = document.getElementById('btn-export-excel');
   grids = {
     electrode: document.getElementById('electrode-grid'),
     tool: document.getElementById('tool-grid'),
