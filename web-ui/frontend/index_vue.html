@@ -249,7 +249,348 @@
         </div>
       </section>
       <section id="lineconfig" class="section" :class="{ active: currentSection === 'lineconfig' }">
-        <div style="display:flex;align-items:center;justify-content:center;height:300px;color:#999;font-size:18px;">板块迁移中 — 线体配置</div>
+        <div class="config-container">
+          <div class="config-toolbar">
+            <button class="btn btn-primary" @click="saveLineConfig">保存配置</button>
+            <button class="btn btn-primary" @click="resetLineConfig">重置</button>
+            <button class="btn btn-primary" @click="importLineConfigExcel">导入Excel</button>
+            <button class="btn btn-primary" @click="exportLineConfigExcel">导出Excel</button>
+            <input type="file" id="lineconfig-excel-input" accept=".xlsx,.xls" style="display:none" @change="handleLineConfigExcel">
+          </div>
+
+          <!-- 顶部：线体配置栏 -->
+          <div class="config-section">
+            <h3 class="section-title">线体配置</h3>
+            <!-- 夹爪系统组 -->
+            <div class="config-group-block">
+              <span class="group-label">夹爪系统</span>
+              <div class="config-grid config-form-inline">
+                <div class="config-field">
+                  <label>夹爪类型</label>
+                  <select class="config-input" v-model="lineConfig.gripperType">
+                    <option value="fixed-single">固定单爪</option>
+                    <option value="fixed-double">固定双爪</option>
+                    <option value="quick-electrode">快换爪（电极）</option>
+                    <option value="quick-tool">快换爪（刀具）</option>
+                    <option value="quick-pallet">快换爪（托盘）</option>
+                  </select>
+                </div>
+                <div class="config-field" v-show="showGrabMode">
+                  <label>抓取方式</label>
+                  <select class="config-input" v-model="lineConfig.grabMode">
+                    <option value="A-grab-B-place">A抓B放</option>
+                    <option value="B-grab-A-place">B抓A放</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- 夹爪列表（快换模式时显示） -->
+            <div class="config-subsection" v-show="showGripperSection">
+              <div class="subsection-header">
+                <h4 class="subsection-title">夹爪配置</h4>
+                <button class="btn-small" @click="addGripper">+ 添加夹爪</button>
+              </div>
+              <div id="gripper-list" class="card-list">
+                <div class="card-item" v-for="(g, idx) in grippersConfig" :key="g.id">
+                  <div class="card-header">
+                    <span class="card-title">{{ g.name || ('夹爪' + (idx + 1)) }}</span>
+                    <button class="btn-remove" title="删除" @click="removeGripper(idx)">×</button>
+                  </div>
+                  <div class="card-body">
+                    <div class="config-field"><label>名称</label><input type="text" class="config-input" v-model="g.name" placeholder="夹爪名称"></div>
+                    <div class="config-field"><label>类型</label>
+                      <select class="config-input" v-model="g.type">
+                        <option value="steel">钢件夹爪</option>
+                        <option value="tool">刀具夹爪</option>
+                        <option value="electrode">电极夹爪</option>
+                        <option value="pallet">托盘夹爪</option>
+                      </select>
+                    </div>
+                    <div class="config-field"><label>料位光电信号</label><input type="text" class="config-input" v-model="g.slotPhotoSignal" placeholder="如：104.00"></div>
+                    <div class="config-field"><label>取夹爪任务号</label><input type="text" class="config-input" v-model="g.grabTaskNo" placeholder="如：D400"></div>
+                    <div class="config-field"><label>放夹爪任务号</label><input type="text" class="config-input" v-model="g.placeTaskNo" placeholder="如：D500"></div>
+                  </div>
+                </div>
+                <div v-if="grippersConfig.length === 0" style="padding:10px 0;color:#8c9bb5;">暂无夹爪，点击"+ 添加夹爪"添加</div>
+              </div>
+            </div>
+
+            <!-- 料架列表（支持多个） -->
+            <div class="config-subsection">
+              <div class="subsection-header">
+                <h4 class="subsection-title">料架配置</h4>
+                <button class="btn-small" @click="addRack">+ 添加料架</button>
+              </div>
+              <div id="rack-list" class="card-list">
+                <div class="card-item" v-for="(rack, idx) in racksConfig" :key="rack.id">
+                  <div class="card-header">
+                    <span class="card-title">{{ rack.name || ('料架 ' + rack.number) }}</span>
+                    <button class="btn-remove" title="删除" @click="removeRack(idx)">×</button>
+                  </div>
+                  <div class="card-body">
+                    <div class="config-field"><label>料架名称</label><input type="text" class="config-input" v-model="rack.name" placeholder="料架名称"></div>
+                    <div class="config-field"><label>料架类型</label>
+                      <select class="config-input" v-model="rack.type">
+                        <option value="electrode">电极料架</option>
+                        <option value="tool">刀具料架</option>
+                        <option value="steel">钢件料架</option>
+                        <option value="pallet">托盘料架</option>
+                      </select>
+                    </div>
+                    <div class="config-field"><label>料架编号</label><input type="number" class="config-input" v-model.number="rack.number" min="1"></div>
+                    <div class="config-field"><label>行数</label><input type="number" class="config-input" v-model.number="rack.rows" min="1"></div>
+                    <div class="config-field"><label>列数</label><input type="number" class="config-input" v-model.number="rack.cols" min="1"></div>
+                    <div class="config-field"><label>光电信号</label><input type="text" class="config-input" v-model="rack.photoSignal" placeholder="DM区地址"></div>
+                    <div class="config-field"><label>开门请求信号</label><input type="text" class="config-input" v-model="rack.openRequest" placeholder="如：103.02"></div>
+                    <div class="config-field"><label>允许开门信号</label><input type="text" class="config-input" v-model="rack.openSignal" placeholder="软件输出给PLC"></div>
+                    <div class="config-field"><label>门状态信号</label><input type="text" class="config-input" v-model="rack.doorClosed" placeholder="如：103.01"></div>
+                    <div class="config-field"><label>门状态标志信号</label><input type="text" class="config-input" v-model="rack.doorFlag" placeholder="脉冲信号地址"></div>
+                    <div class="config-field"><label>抓取开始任务号</label><input type="text" class="config-input" v-model="rack.grabStartTaskNo" placeholder="如: D100"></div>
+                    <div class="config-field"><label>放置开始任务号</label><input type="text" class="config-input" v-model="rack.placeStartTaskNo" placeholder="如: D200"></div>
+                    <div class="config-field"><label>扫描开始任务号</label><input type="text" class="config-input" v-model="rack.scanStartTaskNo" placeholder="如: D300"></div>
+                  </div>
+                </div>
+                <div v-if="racksConfig.length === 0" style="padding:10px 0;color:#8c9bb5;">暂无料架，点击"+ 添加料架"添加</div>
+              </div>
+            </div>
+
+            <!-- 机床列表（支持多个） -->
+            <div class="config-subsection">
+              <div class="subsection-header">
+                <h4 class="subsection-title">机床配置</h4>
+                <button class="btn-small" @click="addMachine">+ 添加机床</button>
+              </div>
+              <div id="machine-list" class="card-list">
+                <div class="card-item" v-for="(m, idx) in machinesConfig" :key="m.id">
+                  <div class="card-header">
+                    <span class="card-title">{{ m.name || (m.type + '-' + m.number) }}</span>
+                    <button class="btn-remove" title="删除" @click="removeMachine(idx)">×</button>
+                  </div>
+                  <div class="card-body">
+                    <div class="config-field"><label>机床编号</label><input type="text" class="config-input" v-model="m.number" placeholder="如: 1"></div>
+                    <div class="config-field"><label>品牌</label><input type="text" class="config-input" v-model="m.type" placeholder="如: fanuc"></div>
+                    <div class="config-field"><label>IP</label><input type="text" class="config-input" v-model="m.ip" placeholder="IP"></div>
+                    <div class="config-field"><label>端口</label><input type="text" class="config-input" v-model="m.port" placeholder="如: 8193"></div>
+                    <div class="config-field"><label>工位数</label><input type="number" class="config-input" v-model.number="m.stationCount" min="1"></div>
+                    <div class="config-field"><label>NC路径</label><input type="text" class="config-input" v-model="m.ncPath" placeholder="NC路径"></div>
+                    <template v-if="isSiemensMachine(m)">
+                      <div class="config-field"><label>会话URL</label><input type="text" class="config-input" v-model="m.sessionUrl" placeholder="如: opc.tcp://192.168.1.1:4840"></div>
+                      <div class="config-field"><label>登录用户名</label><input type="text" class="config-input" v-model="m.username" placeholder="OPC UA 用户名"></div>
+                      <div class="config-field"><label>登录密码</label><input type="password" class="config-input" v-model="m.password" placeholder="OPC UA 密码"></div>
+                    </template>
+                  </div>
+                </div>
+                <div v-if="machinesConfig.length === 0" style="padding:10px 0;color:#8c9bb5;">暂无机床，点击"+ 添加机床"添加</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 中部：PLC信号配置栏 -->
+          <div class="config-section">
+            <h3 class="section-title">PLC信号配置</h3>
+            <div class="config-grid">
+              <div class="config-field">
+                <label>PLC IP地址</label>
+                <input type="text" class="config-input" v-model="plcConfig.ip" placeholder="例如：192.168.1.100">
+              </div>
+              <div class="config-field">
+                <label>PLC端口</label>
+                <input type="number" class="config-input" v-model.number="plcConfig.port">
+              </div>
+            </div>
+
+            <!-- 机器人信号 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">机器人信号</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>机器人光电信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.robot.photo" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>任务开始信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.robot.taskStart" placeholder="如：100.01">
+                </div>
+                <div class="config-field">
+                  <label>任务完成信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.robot.taskDone" placeholder="如：100.02">
+                </div>
+                <div class="config-field">
+                  <label>任务号地址</label>
+                  <input type="text" class="config-input" v-model="plcSignals.robot.taskNumber" placeholder="如：D200">
+                </div>
+                <div class="config-field">
+                  <label>机器人报错信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.robot.error" placeholder="如：100.03">
+                </div>
+                <div class="config-field">
+                  <label>安全位置信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.robot.safePos" placeholder="如：100.04">
+                </div>
+                <div class="config-field">
+                  <label>急停触发信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.robot.estop" placeholder="如：100.05">
+                </div>
+              </div>
+            </div>
+
+            <!-- 随行台信号 -->
+            <div class="config-subsection" id="pallet-signals-section">
+              <h4 class="subsection-title">随行台信号</h4>
+              <div class="config-grid config-form-inline">
+                <div class="config-field">
+                  <label>随行台</label>
+                  <select class="config-input" v-model="lineConfig.palletEnabled">
+                    <option :value="true">有</option>
+                    <option :value="false">无</option>
+                  </select>
+                </div>
+                <div class="config-field" id="pallet-slots-field">
+                  <label>随行台料位数</label>
+                  <input type="number" class="config-input" v-model.number="lineConfig.palletSlots" min="1">
+                </div>
+              </div>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>随行台起始位光电信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.pallet.slotPhoto" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>随行台取开始任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.pallet.grabTaskNo" placeholder="如：D500">
+                </div>
+                <div class="config-field">
+                  <label>随行台放开始任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.pallet.placeTaskNo" placeholder="如：D600">
+                </div>
+                <div class="config-field">
+                  <label>随行台光电开始信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.pallet.photoStart" placeholder="如：100.01">
+                </div>
+              </div>
+            </div>
+
+            <!-- 预设台信号 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">预设台信号</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>预设台光电信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.preset.photo" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>人工操作信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.preset.manual" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>请求开门信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.preset.openRequest" placeholder="如：100.02">
+                </div>
+                <div class="config-field">
+                  <label>允许开门信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.preset.openAllow" placeholder="如：100.03">
+                </div>
+                <div class="config-field">
+                  <label>预设台取任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.preset.grabTaskNo" placeholder="如：D700">
+                </div>
+                <div class="config-field">
+                  <label>预设台放任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.preset.placeTaskNo" placeholder="如：D800">
+                </div>
+                <div class="config-field">
+                  <label>门锁状态信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.preset.doorLock" placeholder="如：100.04">
+                </div>
+              </div>
+            </div>
+
+            <!-- 工件旋转台信号 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">工件旋转台信号</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>旋转台旋转信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.rotary.rotate" placeholder="如：108.00">
+                </div>
+                <div class="config-field">
+                  <label>读取零点信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.rotary.zero" placeholder="如：108.01">
+                </div>
+                <div class="config-field">
+                  <label>取任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.rotary.grabTaskNo" placeholder="如：D900">
+                </div>
+                <div class="config-field">
+                  <label>放任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.rotary.placeTaskNo" placeholder="如：D1000">
+                </div>
+                <div class="config-field">
+                  <label>到位信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.rotary.arrive" placeholder="如：108.02">
+                </div>
+              </div>
+            </div>
+
+            <!-- 清洁站信号 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">清洁站信号</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>清洁位光电信号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.cleaner.photo" placeholder="如：100.00">
+                </div>
+                <div class="config-field">
+                  <label>清洁站取任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.cleaner.grabTaskNo" placeholder="如：D1100">
+                </div>
+                <div class="config-field">
+                  <label>清洁站放任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.cleaner.placeTaskNo" placeholder="如：D1200">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 系统工作流定义 -->
+          <div class="config-section">
+            <h3 class="section-title">系统工作流定义</h3>
+            <div class="config-subsection">
+              <div class="subsection-header">
+                <h4 class="subsection-title">工作流步骤</h4>
+                <button class="btn-small" @click="addWorkflowStep">+ 添加步骤</button>
+              </div>
+              <div class="workflow-table-wrap">
+                <table class="workflow-table">
+                  <thead>
+                    <tr>
+                      <th class="wf-seq">序号</th>
+                      <th class="wf-name">流程名称</th>
+                      <th class="wf-enabled">是否执行</th>
+                      <th class="wf-priority">优先级</th>
+                      <th class="wf-op">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(step, idx) in workflowConfig" :key="idx">
+                      <td class="wf-seq">{{ idx + 1 }}</td>
+                      <td class="wf-name"><input type="text" class="config-input" v-model="step.name" placeholder="如：上料"></td>
+                      <td class="wf-enabled"><input type="checkbox" class="wf-checkbox" v-model="step.enabled"></td>
+                      <td class="wf-priority"><input type="number" class="config-input" v-model.number="step.priority" min="0"></td>
+                      <td class="wf-op"><button class="btn-remove" title="删除" @click="removeWorkflowStep(idx)">×</button></td>
+                    </tr>
+                    <tr v-if="workflowConfig.length === 0">
+                      <td colspan="5" style="padding:20px;text-align:center;color:#8c9bb5;">暂无步骤，点击上方"+ 添加步骤"按钮添加</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="config-hint" style="color:#8c9bb5;font-size:12px;margin-top:8px;">按列表顺序作为默认执行顺序；优先级数值越大越优先（同优先级内按序号执行）。勾选"是否执行"才会纳入工作流。</p>
+            </div>
+          </div>
+
+        </div>
       </section>
     </main>
   </div>

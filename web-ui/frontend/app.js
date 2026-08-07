@@ -44,7 +44,30 @@ new Vue({
     shelfActiveTab: 'electrode',
     shelves: { electrode: [], tool: [], steel: [], pallet: [] },
     shelfRacktypeMap: { electrode: 1, tool: 3, steel: 2, pallet: 4 },
-    shelfDefaultSlots: { electrode: 80, tool: 20, steel: 12, pallet: 16 }
+    shelfDefaultSlots: { electrode: 80, tool: 20, steel: 12, pallet: 16 },
+    // 线体配置板块
+    lineConfig: {
+      rackType: 'fixed',
+      rackCount: 1,
+      rackLayers: 3,
+      rackSlots: 6,
+      gripperType: 'fixed-single',
+      grabMode: 'A-grab-B-place',
+      palletEnabled: false,
+      palletSlots: 4
+    },
+    plcConfig: { ip: '', port: 9600 },
+    plcSignals: {
+      robot: { photo: '', taskStart: '', taskDone: '', taskNumber: '', error: '', safePos: '', estop: '' },
+      pallet: { slotPhoto: '', grabTaskNo: '', placeTaskNo: '', photoStart: '' },
+      preset: { photo: '', manual: '', openRequest: '', openAllow: '', grabTaskNo: '', placeTaskNo: '', doorLock: '' },
+      rotary: { rotate: '', zero: '', grabTaskNo: '', placeTaskNo: '', arrive: '' },
+      cleaner: { photo: '', grabTaskNo: '', placeTaskNo: '' }
+    },
+    racksConfig: [],
+    machinesConfig: [],
+    grippersConfig: [],
+    workflowConfig: []
   },
   computed: {
     logPages() {
@@ -63,7 +86,13 @@ new Vue({
     },
     isWorkflowRunning() { return this.workflowState === 'running'; },
     isWorkflowPaused() { return this.workflowState === 'paused'; },
-    isWorkflowIdle() { return this.workflowState === 'idle'; }
+    isWorkflowIdle() { return this.workflowState === 'idle'; },
+    showGrabMode() { return this.lineConfig.gripperType === 'fixed-double'; },
+    showGripperSection() { return (this.lineConfig.gripperType || '').indexOf('quick-') === 0; },
+    gripperTypeName() {
+      var map = { 'fixed-single': '固定单爪', 'fixed-double': '固定双爪', 'quick-electrode': '快换爪（电极）', 'quick-tool': '快换爪（刀具）', 'quick-pallet': '快换爪（托盘）' };
+      return map[this.lineConfig.gripperType] || '固定单爪';
+    }
   },
   methods: {
     pad(n) { return n < 10 ? '0' + n : '' + n; },
@@ -79,6 +108,7 @@ new Vue({
       this.currentSection = s;
       if (s === 'logs' && this.logData.length === 0) this.loadLogs();
       if (s === 'shelves') this.loadShelves();
+      if (s === 'lineconfig') this.loadLineConfig();
     },
     updateTime() {
       var now = new Date();
@@ -349,6 +379,315 @@ new Vue({
           this.toast('状态已更新', 'success');
         } else { this.toast(res.message || '更新失败', 'error'); }
       } catch (e) { this.toast('更新失败: ' + e.message, 'error'); }
+    },
+    // ==================== 线体配置板块 ====================
+    isSiemensMachine(m) {
+      var t = (m.type || '').toLowerCase();
+      return t === 'siemense' || t === 'siemens';
+    },
+    normalizeRack(r) {
+      var rack = Object.assign({}, r);
+      if (rack.type === '1') rack.type = 'electrode';
+      else if (rack.type === '2') rack.type = 'steel';
+      rack.openRequest = rack.openRequest || '';
+      rack.openSignal = rack.openSignal || '';
+      rack.doorClosed = rack.doorClosed || '';
+      rack.doorFlag = rack.doorFlag || '';
+      rack.grabStartTaskNo = rack.grabStartTaskNo || rack.grabTaskNo || '';
+      rack.placeStartTaskNo = rack.placeStartTaskNo || rack.placeTaskNo || '';
+      rack.scanStartTaskNo = rack.scanStartTaskNo || '';
+      return rack;
+    },
+    async loadLineConfig() {
+      try {
+        // 优先使用 /api/config/raw 保留完整字段（含料架门/任务号等），workflow 来自 /api/config（数据库）
+        var raw = null;
+        try {
+          var resRaw = await apiGet('/api/config/raw');
+          if (resRaw && resRaw.success) raw = resRaw.data;
+        } catch (e) { /* raw 不可用时回退到映射接口 */ }
+        var mapped = null;
+        try {
+          var resMap = await apiGet('/api/config');
+          if (resMap && resMap.success) mapped = resMap.data;
+        } catch (e) { /* silent */ }
+
+        var line = (raw && raw.line) || (mapped && mapped.line) || {};
+        this.lineConfig = {
+          rackType: line.rackType || 'fixed',
+          rackCount: line.rackCount != null ? line.rackCount : 1,
+          rackLayers: line.rackLayers != null ? line.rackLayers : 3,
+          rackSlots: line.rackSlots != null ? line.rackSlots : 6,
+          gripperType: line.gripperType || 'fixed-single',
+          grabMode: line.grabMode || 'A-grab-B-place',
+          palletEnabled: line.palletEnabled === true || line.palletEnabled === 'yes',
+          palletSlots: line.palletSlots != null ? line.palletSlots : 4
+        };
+
+        if (raw) {
+          // raw 结构：machines 是 dict，racks/grippers 是数组，字段完整
+          var rawMachines = raw.machines || {};
+          this.machinesConfig = Object.keys(rawMachines).map(function(id) {
+            var m = rawMachines[id] || {};
+            return {
+              id: id, type: m.type || 'roders', number: m.number != null ? m.number : '1',
+              ip: m.ip || '', port: m.port != null ? m.port : '', stationCount: m.stationCount != null ? m.stationCount : 4,
+              ncPath: m.ncPath || '', sessionUrl: m.sessionUrl || '', username: m.username || '', password: m.password || ''
+            };
+          });
+          this.racksConfig = Array.isArray(raw.racks) ? raw.racks.map(this.normalizeRack) : [];
+          this.grippersConfig = Array.isArray(raw.grippers) ? raw.grippers.slice() : [];
+        } else {
+          this.machinesConfig = Array.isArray(line.machines) ? line.machines.slice() : [];
+          this.racksConfig = Array.isArray(line.racks) ? line.racks.map(this.normalizeRack) : [];
+          this.grippersConfig = Array.isArray(line.grippers) ? line.grippers.slice() : [];
+        }
+        if (this.racksConfig.length === 0) this.addRack();
+
+        var plc = (raw && raw.plc) || (mapped && mapped.plc) || {};
+        this.plcConfig = { ip: plc.ip || '', port: plc.port != null ? plc.port : 9600 };
+        var signals = plc.signals || {};
+        var robot = signals.robot || {};
+        var pallet = signals.pallet || {};
+        var preset = signals.preset || {};
+        var rotary = signals.rotary || {};
+        var cleaner = signals.cleaner || {};
+        this.plcSignals = {
+          robot: { photo: robot.photo || '', taskStart: robot.taskStart || '', taskDone: robot.taskDone || '', taskNumber: robot.taskNumber || '', error: robot.error || '', safePos: robot.safePos || '', estop: robot.estop || '' },
+          pallet: { slotPhoto: pallet.slotPhoto || '', grabTaskNo: pallet.grabTaskNo || '', placeTaskNo: pallet.placeTaskNo || '', photoStart: pallet.photoStart || '' },
+          preset: { photo: preset.photo || '', manual: preset.manual || '', openRequest: preset.openRequest || '', openAllow: preset.openAllow || '', grabTaskNo: preset.grabTaskNo || '', placeTaskNo: preset.placeTaskNo || '', doorLock: preset.doorLock || '' },
+          rotary: { rotate: rotary.rotate || '', zero: rotary.zero || '', grabTaskNo: rotary.grabTaskNo || '', placeTaskNo: rotary.placeTaskNo || '', arrive: rotary.arrive || '' },
+          cleaner: { photo: cleaner.photo || '', grabTaskNo: cleaner.grabTaskNo || '', placeTaskNo: cleaner.placeTaskNo || '' }
+        };
+
+        this.workflowConfig = (mapped && Array.isArray(mapped.workflow)) ? mapped.workflow.map(function(w) {
+          return { id: w.id != null ? w.id : 0, name: w.name || '', enabled: w.enabled === true || w.enabled === 1, priority: w.priority != null ? w.priority : 0 };
+        }) : [];
+      } catch (e) {
+        console.warn('线体配置加载失败', e);
+      }
+    },
+    collectLineConfig() {
+      return {
+        line: {
+          rackType: this.lineConfig.rackType,
+          rackCount: parseInt(this.lineConfig.rackCount) || 1,
+          rackLayers: parseInt(this.lineConfig.rackLayers) || 3,
+          rackSlots: parseInt(this.lineConfig.rackSlots) || 6,
+          gripperType: this.lineConfig.gripperType,
+          grabMode: this.lineConfig.grabMode,
+          palletEnabled: !!this.lineConfig.palletEnabled,
+          palletSlots: parseInt(this.lineConfig.palletSlots) || 4
+        },
+        racks: this.racksConfig,
+        machines: this.machinesConfig,
+        grippers: this.grippersConfig,
+        plc: {
+          ip: this.plcConfig.ip,
+          port: parseInt(this.plcConfig.port) || 9600,
+          signals: JSON.parse(JSON.stringify(this.plcSignals))
+        },
+        workflow: this.workflowConfig.map(function(w, i) {
+          return { id: i + 1, name: w.name || '', enabled: !!w.enabled, priority: parseInt(w.priority) || 0 };
+        })
+      };
+    },
+    async saveLineConfig() {
+      var payload = this.collectLineConfig();
+      try {
+        var res = await apiPost('/api/config', payload);
+        if (res && res.success) {
+          this.toast('配置保存成功', 'success');
+          await this.loadLineConfig();
+        } else {
+          this.toast('保存失败: ' + ((res && res.message) || '未知错误'), 'error');
+        }
+      } catch (e) {
+        console.error('保存线体配置失败', e);
+        this.toast('保存配置失败: ' + e.message, 'error');
+      }
+    },
+    resetLineConfig() {
+      this.racksConfig = [];
+      this.machinesConfig = [];
+      this.grippersConfig = [];
+      this.lineConfig = { rackType: 'fixed', rackCount: 1, rackLayers: 3, rackSlots: 6, gripperType: 'fixed-single', grabMode: 'A-grab-B-place', palletEnabled: false, palletSlots: 4 };
+      this.plcConfig = { ip: '', port: 9600 };
+      this.toast('已重置，点击保存配置生效', 'info');
+    },
+    addRack() {
+      this.racksConfig.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        type: 'electrode',
+        name: '料架' + (this.racksConfig.length + 1),
+        number: this.racksConfig.length + 1,
+        rows: 8,
+        cols: 10,
+        photoSignal: '',
+        openRequest: '',
+        openSignal: '',
+        doorClosed: '',
+        doorFlag: '',
+        grabStartTaskNo: '',
+        placeStartTaskNo: '',
+        scanStartTaskNo: ''
+      });
+    },
+    removeRack(index) { this.racksConfig.splice(index, 1); },
+    addMachine() {
+      this.machinesConfig.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        type: 'roders',
+        number: this.machinesConfig.length + 1,
+        ip: '',
+        port: '',
+        stationCount: 4,
+        ncPath: '',
+        sessionUrl: '',
+        username: '',
+        password: ''
+      });
+    },
+    removeMachine(index) { this.machinesConfig.splice(index, 1); },
+    addGripper() {
+      var gtype = this.lineConfig.gripperType;
+      var typeMap = { 'quick-electrode': 'electrode', 'quick-tool': 'tool', 'quick-pallet': 'pallet' };
+      var defaultType = typeMap[gtype] || 'steel';
+      var typeNames = { steel: '钢件', tool: '刀具', electrode: '电极', pallet: '托盘' };
+      var count = this.grippersConfig.filter(function(g) { return g.type === defaultType; }).length + 1;
+      this.grippersConfig.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        type: defaultType,
+        name: (typeNames[defaultType] || '快换') + '夹爪' + count,
+        number: count,
+        slotPhotoSignal: '',
+        grabTaskNo: '',
+        placeTaskNo: ''
+      });
+    },
+    removeGripper(index) { this.grippersConfig.splice(index, 1); },
+    addWorkflowStep() {
+      this.workflowConfig.push({ id: this.workflowConfig.length + 1, name: '', enabled: true, priority: 0 });
+    },
+    removeWorkflowStep(index) { this.workflowConfig.splice(index, 1); },
+    importLineConfigExcel() {
+      var input = document.getElementById('lineconfig-excel-input');
+      if (input) input.click();
+    },
+    async handleLineConfigExcel(event) {
+      var file = event.target.files[0];
+      if (!file) return;
+      var self = this;
+      try {
+        var XLSX = window.XLSX || await this.loadXlsxLib();
+        if (!XLSX) { this.toast('请先加载xlsx库', 'warning'); return; }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            var workbook = XLSX.read(e.target.result, { type: 'array' });
+            var sheet = workbook.Sheets[workbook.SheetNames[0]];
+            var data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            self.parseExcelConfig(data);
+            self.toast('导入成功', 'success');
+          } catch (err) {
+            console.error('解析Excel失败:', err);
+            self.toast('解析Excel失败', 'error');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } catch (err) {
+        console.error('读取Excel失败:', err);
+        this.toast('读取Excel失败', 'error');
+      }
+      event.target.value = '';
+    },
+    loadXlsxLib() {
+      var self = this;
+      return new Promise(function(resolve) {
+        if (window.XLSX) { resolve(window.XLSX); return; }
+        var script = document.createElement('script');
+        script.src = 'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js';
+        script.onload = function() { resolve(window.XLSX); };
+        script.onerror = function() { resolve(null); };
+        document.head.appendChild(script);
+      });
+    },
+    parseExcelConfig(data) {
+      var self = this;
+      data.forEach(function(row) {
+        var configName = row[0];
+        var subItem = row[1];
+        var value = row[2];
+        if (!configName && !subItem) return;
+        if (configName === '线体配置' || subItem) {
+          switch (subItem) {
+            case '料架类型':
+              var rackTypeMap = { '固定料架': 'fixed', '旋转料架': 'rotating' };
+              self.lineConfig.rackType = rackTypeMap[value] || 'fixed';
+              break;
+            case '料架个数':
+              if (!isNaN(parseInt(value))) self.lineConfig.rackCount = parseInt(value);
+              break;
+            case '料架层数':
+              if (!isNaN(parseInt(value))) self.lineConfig.rackLayers = parseInt(value);
+              break;
+            case '料架每层料位数':
+              if (!isNaN(parseInt(value))) self.lineConfig.rackSlots = parseInt(value);
+              break;
+            case '夹爪类型':
+              var gripperMap = { '固定单爪': 'fixed-single', '固定双爪': 'fixed-double', '快换爪（电极）': 'quick-electrode', '快换爪（刀具）': 'quick-tool', '快换爪（托盘）': 'quick-pallet' };
+              self.lineConfig.gripperType = gripperMap[value] || 'fixed-single';
+              break;
+            case '抓取方式':
+              var grabMap = { 'A抓B放': 'A-grab-B-place', 'B抓A放': 'B-grab-A-place' };
+              self.lineConfig.grabMode = grabMap[value] || 'A-grab-B-place';
+              break;
+            case '随行台有无':
+              self.lineConfig.palletEnabled = value === '有';
+              break;
+            case '随行台料位数':
+              if (!isNaN(parseInt(value))) self.lineConfig.palletSlots = parseInt(value);
+              break;
+          }
+        }
+      });
+    },
+    async exportLineConfigExcel() {
+      try {
+        var XLSX = window.XLSX || await this.loadXlsxLib();
+        if (!XLSX) { this.toast('请先加载xlsx库', 'warning'); return; }
+        var lc = this.lineConfig;
+        var data = [
+          ['配置项名称', '配置项细分', '具体数值'],
+          ['线体配置', '料架类型', lc.rackType === 'fixed' ? '固定料架' : '旋转料架'],
+          ['', '料架个数', lc.rackCount],
+          ['', '料架层数', lc.rackLayers],
+          ['', '料架每层料位数', lc.rackSlots],
+          ['', '夹爪类型', this.gripperTypeName],
+          ['', '抓取方式', lc.grabMode === 'A-grab-B-place' ? 'A抓B放' : 'B抓A放'],
+          ['', '随行台有无', lc.palletEnabled ? '有' : '无'],
+          ['', '随行台料位数', lc.palletSlots],
+          ['', '机床信息', this.machinesConfig.map(function(m) { return m.number + '/' + m.ip + '/' + m.type; }).join('; ')],
+          ['PLC信号', '机器人', '机器人光电信号'],
+          ['', '', '机器人任务开始信号'],
+          ['', '', '机器人任务完成信号'],
+          ['', '', '机器人报错'],
+          ['', '', '机器人安全位置信号'],
+          ['', '', '急停触发'],
+          ['', '随行台', '各料位光电信号'],
+          ['', '预设台', '预设台光电信号'],
+          ['', '', '预设台人工操作信号'],
+          ['', '清洁站', '清洁站清洁位光电信号']
+        ];
+        var ws = XLSX.utils.aoa_to_sheet(data);
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '线体配置');
+        XLSX.writeFile(wb, '线体配置导出_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+        this.toast('导出成功', 'success');
+      } catch (err) {
+        console.error('导出Excel失败:', err);
+        this.toast('导出失败', 'error');
+      }
     },
     startPolling() {
       this.loadDashboard();
