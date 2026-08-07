@@ -271,7 +271,7 @@ namespace MachineMonitor
             {
                 var db = DatabaseRepository.CreateDb();
                 string now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                string sql = "INSERT INTO process_status (process_name, process_status, process_start_time) VALUES ("
+                string sql = "INSERT INTO process_status (workpiece_name, process_status, process_start_time) VALUES ("
                     + SqlStr(step) + ", " + (status == "running" ? 1 : 2) + ", " + SqlStr(now) + ") "
                     + "ON DUPLICATE KEY UPDATE process_status=" + (status == "running" ? 1 : 2)
                     + ", process_end_time=" + (status == "completed" ? SqlStr(now) : "NULL");

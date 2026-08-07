@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -25,13 +25,14 @@ namespace MachineMonitor
             }
 
             var rackAdmin = new List<object>();
-            var dt2 = db.ExeForDtl("SELECT id,rfid,posstatus,workstate,scanstatus,workpiecename,materialname FROM rack_administrate");
+            var dt2 = db.ExeForDtl("SELECT id,racktype,rfid,posstatus,workstate,scanstatus,workpiecename,materialname FROM rack_administrate");
             if (dt2 != null)
             {
                 foreach (DataRow dr in dt2.Rows)
                     rackAdmin.Add(new
                     {
                         id = AppState.SafeInt(dr["id"]),
+                        racktype = AppState.SafeStr(dr["racktype"]),
                         rfid = AppState.SafeStr(dr["rfid"]),
                         posstatus = AppState.SafeInt(dr["posstatus"]),
                         workstate = AppState.SafeInt(dr["workstate"]),
@@ -53,7 +54,7 @@ namespace MachineMonitor
             return AppState.Json(new
             {
                 success = true,
-                data = new { knifeRack, rackAdmin, rackUpdateCount }
+                data = new { rack_administrate = rackAdmin, knife_rack = knifeRack, rackUpdateCount }
             });
         }
 

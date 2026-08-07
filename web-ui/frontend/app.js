@@ -308,13 +308,12 @@ new Vue({
         if (!res.success) { this.shelfFillDefault(); return; }
         var allRows = Array.isArray(res.data && res.data.rack_administrate) ? res.data.rack_administrate : [];
         this.shelfTypes.forEach(function(t) {
-          var racktype = self.shelfRacktypeMap[t.key];
-          var rows = allRows.filter(function(r) { return Number(r.racktype) === racktype; }).sort(function(a, b) { return a.id - b.id; });
-          var map = {};
-          rows.forEach(function(r) { map[Number(r.id)] = r; });
+          var rows = allRows.filter(function(r) {
+            return (r.racktype || '').toString().toLowerCase() === t.key;
+          }).sort(function(a, b) { return a.id - b.id; });
           var arr = [];
           for (var i = 1; i <= self.shelfDefaultSlots[t.key]; i++) {
-            var row = map[i];
+            var row = rows[i - 1];
             arr.push(row ? {
               id: Number(row.id), rfid: row.rfid || '', posstatus: Number(row.posstatus || 0),
               workstate: Number(row.workstate || 0), scanstatus: Number(row.scanstatus || 0),

@@ -14,13 +14,10 @@
       if (!res.success) { fillDefault(); return; }
       const allRows = Array.isArray(res.data?.rack_administrate) ? res.data.rack_administrate : [];
       Object.keys(grids).forEach(type => {
-        const racktype = RACKTYPE_MAP[type];
-        const rows = allRows.filter(r => Number(r.racktype) === racktype).sort((a, b) => a.id - b.id);
-        const map = {};
-        rows.forEach(r => { map[Number(r.id)] = r; });
+        const rows = allRows.filter(r => (r.racktype || '').toString().toLowerCase() === type).sort((a, b) => a.id - b.id);
         shelves[type] = [];
         for (let i = 1; i <= DEFAULT_SLOTS[type]; i++) {
-          const row = map[i];
+          const row = rows[i - 1];
           shelves[type].push(row ? {
             id: Number(row.id), rfid: row.rfid || '', posstatus: Number(row.posstatus || 0),
             workstate: Number(row.workstate || 0), scanstatus: Number(row.scanstatus || 0),
