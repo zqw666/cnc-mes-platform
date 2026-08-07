@@ -336,7 +336,6 @@ function updateWorkflowField(index, field, value) {
 
 // 初始化：从 localStorage 恢复（等待 DOM 就绪）
 // ==================== 全局常量 ====================
-const API_BASE = 'http://localhost:8888';
 
 document.addEventListener('DOMContentLoaded', () => { restoreLineConfig(); });
 
@@ -347,22 +346,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let connected = false;
   let machineData = [];
-
-  // ==================== HTTP 工具 ====================
-  async function apiGet(path) {
-    const r = await fetch(API_BASE + path);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  }
-  async function apiPost(path, body = {}) {
-    const r = await fetch(API_BASE + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  }
 
   // ==================== Element UI 提示（通过 Vue 注入） ====================
   let $message = null;
