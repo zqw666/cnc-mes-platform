@@ -33,7 +33,18 @@ new Vue({
     taskFilteredData: [],
     taskCurrentPage: 1,
     taskFilterTool: '',
-    taskFilterMold: ''
+    taskFilterMold: '',
+    // 料架管理板块
+    shelfTypes: [
+      { key: 'electrode', label: '电极料架' },
+      { key: 'tool', label: '刀具料架' },
+      { key: 'steel', label: '钢件料架' },
+      { key: 'pallet', label: '托盘料架' }
+    ],
+    shelfActiveTab: 'electrode',
+    shelves: { electrode: [], tool: [], steel: [], pallet: [] },
+    shelfRacktypeMap: { electrode: 1, tool: 3, steel: 2, pallet: 4 },
+    shelfDefaultSlots: { electrode: 80, tool: 20, steel: 12, pallet: 16 }
   },
   computed: {
     logPages() {
@@ -60,9 +71,14 @@ new Vue({
       var map = { '正常': 'normal', '运行': 'running', '暂停': 'paused', '停止': 'stopped', '自动': 'auto' };
       return map[status] || 'normal';
     },
+    toast(msg, type) {
+      if (window.ELEMENT && ELEMENT.Message) ELEMENT.Message({ message: msg, type: type || 'info', duration: 2500 });
+      else console.log('[' + type + ']', msg);
+    },
     switchSection(s) {
       this.currentSection = s;
       if (s === 'logs' && this.logData.length === 0) this.loadLogs();
+      if (s === 'shelves') this.loadShelves();
     },
     updateTime() {
       var now = new Date();
@@ -243,6 +259,97 @@ new Vue({
     taskGoPage(p) {
       if (p >= 1 && p <= this.taskPages) this.taskCurrentPage = p;
     },
+    // ==================== 料架管理板块 ====================
+    shelfSwitchTab(key) { this.shelfActiveTab = key; },
+    shelfFillDefault() {
+      var self = this;
+      this.shelfTypes.forEach(function(t) {
+        var arr = [];
+        for (var i = 1; i <= self.shelfDefaultSlots[t.key]; i++) {
+          arr.push({ id: i, rfid: '', posstatus: 0, workstate: 0, racknum: 1, activated: false, selected: false });
+        }
+        self.shelves[t.key] = arr;
+      });
+    },
+    async loadShelves() {
+      var self = this;
+      try {
+        var res = await apiGet('/api/rack/status');
+        if (!res.success) { this.shelfFillDefault(); return; }
+        var allRows = Array.isArray(res.data && res.data.rack_administrate) ? res.data.rack_administrate : [];
+        this.shelfTypes.forEach(function(t) {
+          var racktype = self.shelfRacktypeMap[t.key];
+          var rows = allRows.filter(function(r) { return Number(r.racktype) === racktype; }).sort(function(a, b) { return a.id - b.id; });
+          var map = {};
+          rows.forEach(function(r) { map[Number(r.id)] = r; });
+          var arr = [];
+          for (var i = 1; i <= self.shelfDefaultSlots[t.key]; i++) {
+            var row = map[i];
+            arr.push(row ? {
+              id: Number(row.id), rfid: row.rfid || '', posstatus: Number(row.posstatus || 0),
+              workstate: Number(row.workstate || 0), scanstatus: Number(row.scanstatus || 0),
+              priority: Number(row.priority || 0), racknum: Number(row.racknum || 1),
+              activated: false, selected: false
+            } : { id: i, rfid: '', posstatus: 0, workstate: 0, scanstatus: 0, priority: 0, racknum: 1, activated: false, selected: false });
+          }
+          self.shelves[t.key] = arr;
+        });
+      } catch (e) {
+        console.warn('料架加载失败，使用默认空槽位', e);
+        this.shelfFillDefault();
+      }
+    },
+    shelfStatusOf(row, type) {
+      if (type === 'steel') {
+        if (row.scanstatus === 0) return 'to-scan';
+        if (row.workstate === 1) return 'processing';
+        if (row.workstate === 2) return 'completed';
+        if (row.priority === 1) return 'urgent';
+        if (row.posstatus === 1) return 'pending';
+        return 'no-material';
+      }
+      if (row.workstate === 1) return 'processing';
+      if (row.workstate === 2) return 'completed';
+      if (row.posstatus === 1) return 'pending';
+      return 'no-material';
+    },
+    getStatusText(status) {
+      var map = { processing: '加工中', pending: '待加工', completed: '已完成', 'to-scan': '待扫描', 'no-material': '无料', error: '错误', disabled: '禁用', urgent: '急件' };
+      return map[status] || status;
+    },
+    shelfToggleSelect(type, shelf) { shelf.selected = !shelf.selected; },
+    shelfSelectAll(type) {
+      this.shelves[type].filter(function(s) { return s.activated; }).forEach(function(s) { s.selected = true; });
+    },
+    shelfActivate(type) { this.shelves[type].forEach(function(s) { s.activated = true; }); },
+    shelfLock(type) { this.shelves[type].forEach(function(s) { s.activated = false; }); },
+    async shelfSetStatus(type, status) {
+      var selected = this.shelves[type].filter(function(s) { return s.selected; });
+      if (selected.length === 0) { this.toast('请先选择要操作的料位', 'warning'); return; }
+      var ids = selected.map(function(s) { return s.id; });
+      try {
+        var res = await apiPost('/api/rack/status', { type: type, ids: ids, status: status });
+        if (res.success) {
+          var self = this;
+          selected.forEach(function(s) {
+            s.selected = false;
+            if (type === 'steel') {
+              if (status === 'no-material') s.posstatus = 0;
+              else if (status === 'disable') { s.posstatus = 0; s.workstate = 0; s.scanstatus = 0; }
+              else if (status === 'urgent') s.priority = 1;
+              else if (status === 'activate') s.scanstatus = 1;
+              else if (status === 'lock') s.scanstatus = 0;
+            } else {
+              if (status === 'no-material') s.posstatus = 0;
+              else if (status === 'disable') { s.posstatus = 0; s.workstate = 0; }
+              else if (status === 'activate') s.workstate = 1;
+              else if (status === 'lock') s.workstate = 0;
+            }
+          });
+          this.toast('状态已更新', 'success');
+        } else { this.toast(res.message || '更新失败', 'error'); }
+      } catch (e) { this.toast('更新失败: ' + e.message, 'error'); }
+    },
     startPolling() {
       this.loadDashboard();
       this.syncWorkflowStatus();
@@ -263,6 +370,7 @@ new Vue({
     this.startPolling();
     this.loadLogs();
     this.genTaskDemo();
+    this.loadShelves();
     this.clockTimer = setInterval(this.updateTime, 1000);
     this.updateTime();
   },

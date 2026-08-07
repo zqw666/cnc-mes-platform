@@ -162,8 +162,40 @@
           <div class="pager-info">每页最多显示 50 行</div>
         </div>
       </section>
-      <section id="shelves" class="section" :class="{ active: currentSection === 'shelves' }">
-        <div style="display:flex;align-items:center;justify-content:center;height:300px;color:#999;font-size:18px;">板块迁移中 — 料架管理</div>
+            <section id="shelves" class="section" :class="{ active: currentSection === 'shelves' }">
+        <div class="shelf-tabs">
+          <button v-for="t in shelfTypes" :key="t.key" class="tab-btn" :class="{ active: shelfActiveTab === t.key }" @click="shelfSwitchTab(t.key)">{{ t.label }}</button>
+        </div>
+
+        <div v-for="t in shelfTypes" :key="t.key" class="tab-content" :class="{ active: shelfActiveTab === t.key }" :id="t.key + '-tab'">
+          <div class="shelf-controls">
+            <div class="control-buttons">
+              <button class="btn" @click="shelfSelectAll(t.key)">全选</button>
+              <button class="btn" @click="shelfActivate(t.key)">激活</button>
+              <button class="btn" @click="shelfLock(t.key)">锁定</button>
+              <button class="btn" @click="shelfSetStatus(t.key, 'disable')">禁用</button>
+              <button class="btn" @click="shelfSetStatus(t.key, 'no-material')">无料</button>
+            </div>
+            <div class="status-legend">
+              <div class="legend-item"><div class="icon disabled"></div>禁用</div>
+              <div class="legend-item"><div class="icon no-material"></div>无料</div>
+              <div class="legend-item"><div class="icon" style="background-color:blue"></div>加工中</div>
+              <div class="legend-item"><div class="icon" style="background-color:yellow"></div>待加工</div>
+              <div class="legend-item"><div class="icon" style="background-color:green"></div>加工完成</div>
+              <div class="legend-item"><div class="icon" style="background-color:gray"></div>待扫描</div>
+              <div class="legend-item"><div class="icon" style="background-color:red"></div>错误</div>
+            </div>
+          </div>
+          <div class="shelf-grid" :id="t.key + '-grid'">
+            <div v-for="shelf in shelves[t.key]" :key="shelf.id" class="shelf-item" :class="shelf.activated ? 'activated' : 'locked'" :data-status="shelfStatusOf(shelf, t.key)">
+              <input type="checkbox" class="shelf-checkbox" :checked="shelf.selected" @change="shelfToggleSelect(t.key, shelf)">
+              <div class="shelf-position">#{{ shelf.id }}</div>
+              <div class="shelf-info-row"><span class="shelf-info-label">监控:</span><span class="shelf-info-value shelf-rfid">{{ shelf.rfid || '-' }}</span></div>
+              <div class="shelf-info-row"><span class="shelf-info-label">工件:</span><span class="shelf-info-value shelf-partname">{{ shelf.partName || (shelf.rfid ? '未知工件' : '-') }}</span></div>
+              <div class="shelf-status" :class="'status-text-' + shelfStatusOf(shelf, t.key)"></div>
+            </div>
+          </div>
+        </div>
       </section>
             <section id="logs" class="section" :class="{ active: currentSection === 'logs' }">
         <div class="log-toolbar">
