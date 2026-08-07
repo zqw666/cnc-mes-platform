@@ -1,0 +1,126 @@
+[2026-08-06 17:15:45][INFO][] [MachineMonitor] 启动中... 端口: 8888
+[2026-08-06 17:15:45][INFO][] [MachineMonitor] 数据库类型: MySQL
+[2026-08-06 17:15:45][INFO][] [MachineMonitor] 等待前端启动请求... (调用 /api/workflow/start 开始执行分包)
+[2026-08-06 17:15:45][WARN][] [DB] 创建MySQL数据库失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:15:45][ERROR][] [DB] 初始化数据库失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:15:45][WARN][] [Workflow] 确保工作流步骤失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:15:45][INFO][] [MachineMonitor] HTTP 服务已启动 http://localhost:8888/
+[2026-08-06 17:15:45][INFO][] [MachineMonitor] 当前状态: 等待启动指令 | 数据查询接口已就绪
+[2026-08-06 17:15:51][ERROR][] [ERROR] System.IO.FileLoadException: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+文件名:“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”
+   在 DataCommonOperate.CommonMysql.Initial()
+   在 DataCommonOperate.CommonMysql..ctor(String constr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonMysql.cs:行号 25
+   在 DataCommonOperate.CommonFactory.CreateInstance(CommonData CommonData_Parameter, String connstr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonFactory.cs:行号 56
+   在 MachineMonitor.DatabaseRepository.CreateDb() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Repository\DatabaseRepository.cs:行号 12
+   在 MachineMonitor.DashboardController.GetDashboard() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Controllers\DashboardController.cs:行号 12
+   在 MachineMonitor.Router.Handle(HttpListenerContext ctx) 位置 D:\桌面\erp\前后端分离\web-ui\backend\Router.cs:行号 42
+
+警告: 程序集绑定日志记录被关闭。
+要启用程序集绑定失败日志记录，请将注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD)设置为 1。
+注意: 会有一些与程序集绑定失败日志记录关联的性能损失。
+要关闭此功能，请移除注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog]。
+
+[2026-08-06 17:16:14][ERROR][] [ERROR] System.IO.FileLoadException: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+文件名:“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”
+   在 DataCommonOperate.CommonMysql.Initial()
+   在 DataCommonOperate.CommonMysql..ctor(String constr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonMysql.cs:行号 25
+   在 DataCommonOperate.CommonFactory.CreateInstance(CommonData CommonData_Parameter, String connstr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonFactory.cs:行号 56
+   在 MachineMonitor.DatabaseRepository.CreateDb() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Repository\DatabaseRepository.cs:行号 12
+   在 MachineMonitor.DashboardController.GetDashboard() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Controllers\DashboardController.cs:行号 12
+   在 MachineMonitor.Router.Handle(HttpListenerContext ctx) 位置 D:\桌面\erp\前后端分离\web-ui\backend\Router.cs:行号 42
+
+警告: 程序集绑定日志记录被关闭。
+要启用程序集绑定失败日志记录，请将注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD)设置为 1。
+注意: 会有一些与程序集绑定失败日志记录关联的性能损失。
+要关闭此功能，请移除注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog]。
+
+[2026-08-06 17:16:14][ERROR][] [Workflow] 读取流程失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:16:14][ERROR][] [ERROR] System.IO.FileLoadException: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+文件名:“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”
+   在 DataCommonOperate.CommonMysql.Initial()
+   在 DataCommonOperate.CommonMysql..ctor(String constr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonMysql.cs:行号 25
+   在 DataCommonOperate.CommonFactory.CreateInstance(CommonData CommonData_Parameter, String connstr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonFactory.cs:行号 56
+   在 MachineMonitor.DatabaseRepository.CreateDb() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Repository\DatabaseRepository.cs:行号 12
+   在 MachineMonitor.RackController.GetRackStatus() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Controllers\RackController.cs:行号 13
+   在 MachineMonitor.Router.Handle(HttpListenerContext ctx) 位置 D:\桌面\erp\前后端分离\web-ui\backend\Router.cs:行号 58
+
+警告: 程序集绑定日志记录被关闭。
+要启用程序集绑定失败日志记录，请将注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD)设置为 1。
+注意: 会有一些与程序集绑定失败日志记录关联的性能损失。
+要关闭此功能，请移除注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog]。
+
+[2026-08-06 17:16:17][ERROR][] [Workflow] 读取流程失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:16:17][ERROR][] [ERROR] System.IO.FileLoadException: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+文件名:“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”
+   在 DataCommonOperate.CommonMysql.Initial()
+   在 DataCommonOperate.CommonMysql..ctor(String constr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonMysql.cs:行号 25
+   在 DataCommonOperate.CommonFactory.CreateInstance(CommonData CommonData_Parameter, String connstr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonFactory.cs:行号 56
+   在 MachineMonitor.DatabaseRepository.CreateDb() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Repository\DatabaseRepository.cs:行号 12
+   在 MachineMonitor.DashboardController.GetDashboard() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Controllers\DashboardController.cs:行号 12
+   在 MachineMonitor.Router.Handle(HttpListenerContext ctx) 位置 D:\桌面\erp\前后端分离\web-ui\backend\Router.cs:行号 42
+
+警告: 程序集绑定日志记录被关闭。
+要启用程序集绑定失败日志记录，请将注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD)设置为 1。
+注意: 会有一些与程序集绑定失败日志记录关联的性能损失。
+要关闭此功能，请移除注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog]。
+
+[2026-08-06 17:16:20][ERROR][] [Workflow] 读取流程失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:16:20][ERROR][] [ERROR] System.IO.FileLoadException: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+文件名:“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”
+   在 DataCommonOperate.CommonMysql.Initial()
+   在 DataCommonOperate.CommonMysql..ctor(String constr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonMysql.cs:行号 25
+   在 DataCommonOperate.CommonFactory.CreateInstance(CommonData CommonData_Parameter, String connstr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonFactory.cs:行号 56
+   在 MachineMonitor.DatabaseRepository.CreateDb() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Repository\DatabaseRepository.cs:行号 12
+   在 MachineMonitor.DashboardController.GetDashboard() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Controllers\DashboardController.cs:行号 12
+   在 MachineMonitor.Router.Handle(HttpListenerContext ctx) 位置 D:\桌面\erp\前后端分离\web-ui\backend\Router.cs:行号 42
+
+警告: 程序集绑定日志记录被关闭。
+要启用程序集绑定失败日志记录，请将注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD)设置为 1。
+注意: 会有一些与程序集绑定失败日志记录关联的性能损失。
+要关闭此功能，请移除注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog]。
+
+[2026-08-06 17:16:23][ERROR][] [Workflow] 读取流程失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:16:23][ERROR][] [ERROR] System.IO.FileLoadException: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+文件名:“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”
+   在 DataCommonOperate.CommonMysql.Initial()
+   在 DataCommonOperate.CommonMysql..ctor(String constr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonMysql.cs:行号 25
+   在 DataCommonOperate.CommonFactory.CreateInstance(CommonData CommonData_Parameter, String connstr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonFactory.cs:行号 56
+   在 MachineMonitor.DatabaseRepository.CreateDb() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Repository\DatabaseRepository.cs:行号 12
+   在 MachineMonitor.DashboardController.GetDashboard() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Controllers\DashboardController.cs:行号 12
+   在 MachineMonitor.Router.Handle(HttpListenerContext ctx) 位置 D:\桌面\erp\前后端分离\web-ui\backend\Router.cs:行号 42
+
+警告: 程序集绑定日志记录被关闭。
+要启用程序集绑定失败日志记录，请将注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD)设置为 1。
+注意: 会有一些与程序集绑定失败日志记录关联的性能损失。
+要关闭此功能，请移除注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog]。
+
+[2026-08-06 17:16:26][ERROR][] [Workflow] 读取流程失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:16:26][ERROR][] [ERROR] System.IO.FileLoadException: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+文件名:“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”
+   在 DataCommonOperate.CommonMysql.Initial()
+   在 DataCommonOperate.CommonMysql..ctor(String constr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonMysql.cs:行号 25
+   在 DataCommonOperate.CommonFactory.CreateInstance(CommonData CommonData_Parameter, String connstr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonFactory.cs:行号 56
+   在 MachineMonitor.DatabaseRepository.CreateDb() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Repository\DatabaseRepository.cs:行号 12
+   在 MachineMonitor.DashboardController.GetDashboard() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Controllers\DashboardController.cs:行号 12
+   在 MachineMonitor.Router.Handle(HttpListenerContext ctx) 位置 D:\桌面\erp\前后端分离\web-ui\backend\Router.cs:行号 42
+
+警告: 程序集绑定日志记录被关闭。
+要启用程序集绑定失败日志记录，请将注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD)设置为 1。
+注意: 会有一些与程序集绑定失败日志记录关联的性能损失。
+要关闭此功能，请移除注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog]。
+
+[2026-08-06 17:16:30][ERROR][] [Workflow] 读取流程失败: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+[2026-08-06 17:16:30][ERROR][] [ERROR] System.IO.FileLoadException: 未能加载文件或程序集“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”或它的某一个依赖项。找到的程序集清单定义与程序集引用不匹配。 (异常来自 HRESULT:0x80131040)
+文件名:“MySql.Data, Version=8.0.20.0, Culture=neutral, PublicKeyToken=c5687fc88969c44d”
+   在 DataCommonOperate.CommonMysql.Initial()
+   在 DataCommonOperate.CommonMysql..ctor(String constr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonMysql.cs:行号 25
+   在 DataCommonOperate.CommonFactory.CreateInstance(CommonData CommonData_Parameter, String connstr) 位置 D:\桌面\erp\前后端分离\CommonOperateDll\CommonOperateDll\DataCommonOperate\CommonFactory.cs:行号 56
+   在 MachineMonitor.DatabaseRepository.CreateDb() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Repository\DatabaseRepository.cs:行号 12
+   在 MachineMonitor.DashboardController.GetDashboard() 位置 D:\桌面\erp\前后端分离\web-ui\backend\Controllers\DashboardController.cs:行号 12
+   在 MachineMonitor.Router.Handle(HttpListenerContext ctx) 位置 D:\桌面\erp\前后端分离\web-ui\backend\Router.cs:行号 42
+
+警告: 程序集绑定日志记录被关闭。
+要启用程序集绑定失败日志记录，请将注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog] (DWORD)设置为 1。
+注意: 会有一些与程序集绑定失败日志记录关联的性能损失。
+要关闭此功能，请移除注册表值 [HKLM\Software\Microsoft\Fusion!EnableLog]。
+

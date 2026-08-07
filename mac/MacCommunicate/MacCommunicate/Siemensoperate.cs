@@ -6,7 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using WinSCP;
+
 
 namespace MacCommunicate
 {
@@ -122,7 +122,7 @@ namespace MacCommunicate
         /// <summary>
         /// 获取通讯连接状态
         /// </summary>
-        public bool SessionConnected { get { return this.Session.Opened; } }
+        public bool SessionConnected { get { return _fileTransfer.IsConnected; } }
 
         /// <summary>
         /// 获取或设置当前机床加工程序的总行数
@@ -269,9 +269,10 @@ namespace MacCommunicate
         #region 机床内程序操作相关
 
         /// <summary>
-        /// 和机床通信，读取程序存储卡
+        /// 文件传输服务（SCP/SFTP），和机床通信，读取程序存储卡
         /// </summary>
-        private Session Session = new Session();
+        private readonly IFileTransferService _fileTransfer;
+        private readonly int _port = 22;
 
         #endregion
 
@@ -302,7 +303,9 @@ namespace MacCommunicate
         /// <param name="SftpUserName">机床 SFTP 用户名，默认 user</param>
         /// <param name="SftpPassword">机床 SFTP 密码，默认 CUSTOMER</param>
         public Siemensoperate(string IP, string UserName, string PassWord, string WinScpHostKey,
-            string SessionUrl = null, string SftpUserName = "user", string SftpPassword = "CUSTOMER")
+            string SessionUrl = null, string SftpUserName = "user", string SftpPassword = "CUSTOMER",
+            IFileTransferService fileTransfer = null,
+            int port = 22)
         {
             Michine_IP = IP;//设置连接机床的IP
             Michine_UserName = UserName;//设置连接机床的登录用户名
@@ -311,6 +314,8 @@ namespace MacCommunicate
             this.SessionUrl = string.IsNullOrWhiteSpace(SessionUrl) ? null : SessionUrl.Trim();
             if (!string.IsNullOrWhiteSpace(SftpUserName)) this.SftpUserName = SftpUserName.Trim();
             this.SftpPassword = SftpPassword ?? this.SftpPassword;
+            _port = port;
+            _fileTransfer = fileTransfer ?? new WinScpFileTransferService(IP, SftpUserName, this.SftpPassword, WinScpHostKey, port);
         }
 
         /// <summary>
@@ -331,7 +336,7 @@ namespace MacCommunicate
             try
             {
                 Server.Disconnect();
-                Session.Close();
+                _fileTransfer.Close();
             }
             catch { }
         }
@@ -367,16 +372,8 @@ namespace MacCommunicate
                         if (nameSpaceArray[i].ToString() == "SinumerikVarProvider")
                         {
                             m_NameSpaceIndex = i;
-                            SessionOptions sess = new SessionOptions
-                            {
-                                Protocol = Protocol.Scp,
-                                HostName = Michine_IP,
-                                UserName = SftpUserName,
-                                Password = SftpPassword,
-                                SshHostKeyFingerprint = WinScp_HostKey,
-                            };
-                            Session.Open(sess);//该函数连接的时间较长
-                            if (Session.Opened == true)
+                            _fileTransfer.Connect();//该函数连接的时间较长
+                            if (_fileTransfer.IsConnected == true)
                             {
                                 Connected = true;
                                 Subscription = Server.AddSubscription(300);
@@ -399,7 +396,7 @@ namespace MacCommunicate
             Server.subscriptionInfo -= new Server.SubscriptionInfo(m_Server_subscriptionInfo);
             try
             {
-                Session.Close();
+                _fileTransfer.Close();
             }
             catch { }
             Connected = false;
@@ -478,28 +475,9 @@ namespace MacCommunicate
                 try
                 {
                     this.AllLine = Get_Program_Line(LocalPath);//给当前对象的程序行数赋值
-                    if (!Session.Opened)//连接已断开
-                    {
-                        Session = new Session();
-                        SessionOptions sess = new SessionOptions
-                        {
-                            Protocol = Protocol.Scp,
-                            HostName = Michine_IP,
-                            UserName = SftpUserName,
-                            Password = SftpPassword,
-                            SshHostKeyFingerprint = WinScp_HostKey,
-                        };
-                        Session.Open(sess);//重新连接
-                    }
-                    TransferOptions transferOptions = new TransferOptions();
-                    transferOptions.TransferMode = TransferMode.Binary;
-                    TransferOperationResult transferResult;
-                    transferResult = Session.PutFiles(LocalPath, RemotePath, false, transferOptions);
-                    if (transferResult.IsSuccess)
-                        return true;
+                    return _fileTransfer.UploadFile(LocalPath, RemotePath);
                 }
                 catch { return false; }
-                return false;
             }
         }
 
@@ -514,13 +492,9 @@ namespace MacCommunicate
             {
                 try
                 {
-                    RemovalOperationResult transferResult;
-                    transferResult = Session.RemoveFiles(RemotePath);
-                    if (transferResult.IsSuccess)
-                        return true;
+                    return _fileTransfer.DeleteFile(RemotePath);
                 }
                 catch { return false; }
-                return false;
             }
         }
 
@@ -536,16 +510,12 @@ namespace MacCommunicate
             {
                 try
                 {
-                    TransferOptions transferOptions = new TransferOptions();
-                    transferOptions.TransferMode = TransferMode.Binary;
-                    TransferOperationResult transferResult;
-                    transferResult = Session.GetFiles(RemotePath, LocalPath.TrimEnd('\\') + "\\", false, transferOptions);
-                    if (transferResult.IsSuccess)
-                        return true;
+                    return _fileTransfer.DownloadFile(LocalPath, RemotePath);
                 }
                 catch { return false; }
-                return false;
             }
         }
     }
 }
+
+

@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // 扫描流程 - SubProcess
 // 1. 置换夹爪流程
 //    - 判定机器人是固定爪还是快换爪
@@ -15,7 +15,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -30,23 +29,6 @@ namespace scan
 {
     class Program
     {
-        // 配置：始终与 MachineMonitor.exe 执行路径一致
-        // 从当前运行目录向上逐级查找 config.json，避免受 subs/ 嵌套层级影响
-        static string ConfigPath = ResolveConfigPath();
-
-        static string ResolveConfigPath()
-        {
-            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-            while (dir != null)
-            {
-                string candidate = Path.Combine(dir.FullName, "config.json");
-                if (File.Exists(candidate))
-                    return candidate;
-                dir = dir.Parent;
-            }
-            // 兜底：回到 MachineMonitor.exe 同级目录（默认退一级）
-            return Path.Combine(Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).FullName, "config.json");
-        }
         static readonly string ApiBase = "http://localhost:8888";
         static readonly JavaScriptSerializer Js = new JavaScriptSerializer();
         static readonly string StepName = "scan";
@@ -104,7 +86,9 @@ namespace scan
 
             try
             {
-                LoadConfig();
+                var cfg = ConfigClient.FetchConfig(ApiBase);
+                if (cfg.Count == 0) { LogHelper.Error("获取配置失败"); return; }
+                ExtractConfig(cfg);
                 Mysql = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
 
                 // 连接 PLC
@@ -179,150 +163,8 @@ namespace scan
             LogHelper.Info( "【" + DisplayName + "】分包结束");
         }
 
-        static void LoadConfig()
-        {
-            try
-            {
-                if (File.Exists(ConfigPath))
-                {
-                    var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
-
-                    // eman 数据库配置
-                    if (cfg.ContainsKey("eman"))
-                    {
-                        var eman = GetDict(cfg, "eman");
-                        string ehost = GetStr(eman, "host", "172.16.128.243");
-                        int eport = GetInt(eman, "port", 1433);
-                        string edb = GetStr(eman, "database", "eman");
-                        string euser = GetStr(eman, "user", "sa");
-                        string epwd = GetStr(eman, "password", "19830617");
-                        EmanConnStr = $"Server={ehost},{eport};Database={edb};User Id={euser};Password={epwd};";
-                        EmanEnabled = true;
-                        LogHelper.Info( "Eman数据库配置: " + ehost + ":" + eport);
-                    }
-
-                    if (cfg.ContainsKey("database"))
-                    {
-                        var db = GetDict(cfg, "database");
-                        string host = GetStr(db, "host", "localhost");
-                        string dbname = GetStr(db, "database", "qianduantest");
-                        string user = GetStr(db, "user", "root");
-                        string pwd = GetStr(db, "password", "123456");
-                        DbType = GetStr(db, "type", "mysql").ToLower();
-                        if (DbType == "sqlserver")
-                        {
-                            int dbport = GetInt(db, "port", 1433);
-                            ConnStr = $"Server={host},{dbport};Database={dbname};User Id={user};Password={pwd};";
-                        }
-                        else
-                        {
-                            int dbport = GetInt(db, "port", 3306);
-                            ConnStr = $"Server={host};Port={dbport};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
-                        }
-                    }
-
-                    if (cfg.ContainsKey("plc"))
-                    {
-                        var plc = GetDict(cfg, "plc");
-                        if (plc.ContainsKey("ip")) PlcIp = GetStr(plc, "ip", PlcIp);
-                        if (plc.ContainsKey("port")) PlcPort = GetInt(plc, "port", PlcPort);
-                        if (plc.ContainsKey("dm"))
-                        {
-                            var dm = GetDict(plc, "dm");
-                            if (dm.ContainsKey("task_number")) PlcDm = GetInt(dm, "task_number", PlcDm);
-                        }
-                    }
-
-                    // 夹爪类型（从 line.gripperType 读取）
-                    if (cfg.ContainsKey("line"))
-                    {
-                        var line = GetDict(cfg, "line");
-                        GripperType = GetStr(line, "gripperType", "fixed-single");
-                        IsFixedGripper = GripperType == "fixed-single" || GripperType == "fixed-double";
-                    }
-
-                    // 快换夹爪列表
-                    Grippers.Clear();
-                    if (!IsFixedGripper && cfg.ContainsKey("grippers") && cfg["grippers"] != null)
-                    {
-                        var glist = cfg["grippers"];
-                        IEnumerable<object> enumerable = null;
-                        if (glist is System.Collections.ArrayList al) enumerable = al.Cast<object>();
-                        else if (glist is object[] arr) enumerable = arr;
-                        else if (glist is IEnumerable<object> ie) enumerable = ie;
-                        if (enumerable != null)
-                            foreach (var item in enumerable)
-                            {
-                                var g = item as Dictionary<string, object>;
-                                if (g == null) continue;
-                                Grippers.Add(new GripperConfig
-                                {
-                                    Id = GetStr(g, "id", ""),
-                                    Type = GetStr(g, "type", "steel"),
-                                    Name = GetStr(g, "name", ""),
-                                    Number = GetStr(g, "number", ""),
-                                    SlotPhotoSignal = GetStr(g, "slotPhotoSignal", ""),
-                                    GrabTaskNo = GetStr(g, "grabTaskNo", ""),
-                                    PlaceTaskNo = GetStr(g, "placeTaskNo", "")
-                                });
-                            }
-                    }
-
-
-
-                    if (cfg.ContainsKey("rfid_port"))
-                        RfidCom = GetStr(cfg, "rfid_port", RfidCom);
-
-                    // 扫码器配置
-                    if (cfg.ContainsKey("scanner"))
-                    {
-                        var scanner = GetDict(cfg, "scanner");
-                        if (scanner.ContainsKey("type"))
-                            ScannerType = GetStr(scanner, "type", ScannerType).ToLower();
-                        if (scanner.ContainsKey("rcd"))
-                        {
-                            var rcdCfg = GetDict(scanner, "rcd");
-                            if (rcdCfg.ContainsKey("ip")) RcdIp = GetStr(rcdCfg, "ip", RcdIp);
-                            if (rcdCfg.ContainsKey("port")) RcdPort = GetStr(rcdCfg, "port", RcdPort);
-                            if (rcdCfg.ContainsKey("heartbeatInterval")) RcdHeartbeatInterval = GetInt(rcdCfg, "heartbeatInterval", RcdHeartbeatInterval);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogHelper.Warn( "加载配置失败，使用默认配置: " + ex.Message);
-            }
-        }
-
-        // 辅助方法：安全获取嵌套字典
-        static Dictionary<string, object> GetDict(Dictionary<string, object> d, string key)
-        {
-            if (!d.ContainsKey(key) || d[key] == null) return new Dictionary<string, object>();
-            if (d[key] is Dictionary<string, object> nested) return nested;
-            if (d[key] is System.Collections.Generic.Dictionary<string, object> nested2) return nested2;
-            try { return Js.Deserialize<Dictionary<string, object>>(d[key].ToString()) ?? new Dictionary<string, object>(); }
-            catch { return new Dictionary<string, object>(); }
-        }
-
-        static string GetStr(Dictionary<string, object> d, string key, string def = "")
-        {
-            return d.ContainsKey(key) && d[key] != null ? d[key].ToString() : def;
-        }
-
-        static int GetInt(Dictionary<string, object> d, string key, int def = 0)
-        {
-            return d.ContainsKey(key) && d[key] != null ? Convert.ToInt32(d[key]) : def;
-        }
-
-
-        /// <summary>
-        /// 置换夹爪流程（重写版）
-        /// 1. 固定爪：判定无工件 → 完成
-        /// 2. 快换爪：读取 DB robotmessage.clampposstatus
-        ///    0→手上无夹爪→完成
-        ///    1→手上有夹爪→判定是否有工件→无工件则放置夹爪→有工件则先放工件到料架再放夹爪
-        /// </summary>
+        
+        
         static bool ChangeGripper()
         {
             LogHelper.Info( "开始置换夹爪流程...");
@@ -987,7 +829,82 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         /// <param name="status">状态: no-material, to-scan, pending, urgent, processing, completed, scan-failed</param>
         /// <param name="rfid">RFID编号</param>
         /// <param name="message">消息</param>
-        static void NotifyRackUpdate(int position, string rackType, string status, string rfid, string message)
+        
+        static void ExtractConfig(Dictionary<string, object> cfg)
+        {
+            try
+            {
+                if (cfg == null || cfg.Count == 0) return;
+                var db = ConfigClient.GetDict(cfg, "database");
+                string host = ConfigClient.GetStr(db, "host", "localhost");
+                string dbname = ConfigClient.GetStr(db, "database", "qianduantest");
+                string user = ConfigClient.GetStr(db, "user", "root");
+                string pwd = ConfigClient.GetStr(db, "password", "123456");
+                DbType = ConfigClient.GetStr(db, "type", "mysql").ToLower();
+                if (DbType == "sqlserver")
+                {
+                    int dbport = ConfigClient.GetInt(db, "port", 1433);
+                    ConnStr = $"Server={host},{dbport};Database={dbname};User Id={user};Password={pwd};";
+                }
+                else
+                {
+                    ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
+                }
+
+                var plcCfg = ConfigClient.GetDict(cfg, "plc");
+                if (plcCfg.Count > 0)
+                {
+                    PlcIp = ConfigClient.GetStr(plcCfg, "ip", "192.168.1.1");
+                    PlcPort = ConfigClient.GetInt(plcCfg, "port", 9600);
+                    var signals = ConfigClient.GetDict(plcCfg, "signals");
+                    var robotSig = ConfigClient.GetDict(signals, "robot");
+                    if (robotSig.Count > 0)
+                    {
+                        TaskStartAddr = ConfigClient.GetStr(robotSig, "taskStart", "");
+                        TaskFinishAddr = ConfigClient.GetStr(robotSig, "taskDone", "");
+                        RobotEleAddr = ConfigClient.GetStr(robotSig, "photo", "");
+                    }
+                    var machineSig = ConfigClient.GetDict(signals, "machine");
+                    if (machineSig.Count > 0)
+                    {
+                        string startNoStr = ConfigClient.GetStr(machineSig, "startTaskNo", "0");
+                        // MachineStartTaskNo not used in scan
+                    }
+                    // 兜底旧格式
+                    var addrs = ConfigClient.GetDict(plcCfg, "addresses");
+                    if (string.IsNullOrEmpty(TaskFinishAddr) && addrs.Count > 0)
+                        TaskFinishAddr = ConfigClient.GetStr(addrs, "task_finish", "");
+                    if (string.IsNullOrEmpty(RobotEleAddr) && addrs.Count > 0)
+                        RobotEleAddr = ConfigClient.GetStr(addrs, "robot_ele", "");
+                }
+
+                var line = ConfigClient.GetDict(cfg, "line");
+                if (line.Count > 0)
+                {
+                    GripperType = ConfigClient.GetStr(line, "gripperType", "fixed-single");
+                    IsFixedGripper = GripperType == "fixed-single" || GripperType == "fixed-double";
+                }
+
+                Grippers.Clear();
+                if (!IsFixedGripper && cfg.ContainsKey("grippers") && cfg["grippers"] != null)
+                {
+                    var glist = cfg["grippers"];
+                    if (glist is System.Collections.ArrayList al)
+                        foreach (var item in al) AddGripper(item);
+                    else if (glist is object[] arr)
+                        foreach (var item in arr) AddGripper(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Warn("提取配置失败，使用默认配置: " + ex.Message);
+            }
+        }
+
+
+        static void AddGripper(object item) { var g = item as Dictionary<string,object>; if (g==null) return; Grippers.Add(new GripperConfig{Id=ConfigClient.GetStr(g,"id",""),Type=ConfigClient.GetStr(g,"type","steel"),Name=ConfigClient.GetStr(g,"name",""),Number=ConfigClient.GetStr(g,"number",""),SlotPhotoSignal=ConfigClient.GetStr(g,"slotPhotoSignal",""),GrabTaskNo=ConfigClient.GetStr(g,"grabTaskNo",""),PlaceTaskNo=ConfigClient.GetStr(g,"placeTaskNo","")}); }
+
+static void NotifyRackUpdate(int position, string rackType, string status, string rfid, string message)
         {
             try
             {

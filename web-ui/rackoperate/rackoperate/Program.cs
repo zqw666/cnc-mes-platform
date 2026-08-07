@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // 料架操作 - SubProcess（多料架循环巡检版）
 // 1. 读取 config.json 中的 racks[] 料架配置
 // 2. 循环遍历每个料架（最多3轮）：
@@ -44,20 +44,6 @@ namespace rackoperate
         }
 
         // ==================== 配置 ====================
-        static string ConfigPath = ResolveConfigPath();
-
-        static string ResolveConfigPath()
-        {
-            var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-            while (dir != null)
-            {
-                string candidate = Path.Combine(dir.FullName, "config.json");
-                if (File.Exists(candidate)) return candidate;
-                dir = dir.Parent;
-            }
-            return Path.Combine(Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).FullName, "config.json");
-        }
-
         static readonly string ApiBase = "http://localhost:8888";
         static readonly JavaScriptSerializer Js = new JavaScriptSerializer();
         static readonly string StepName = "rack_operate";
@@ -95,10 +81,9 @@ namespace rackoperate
 
             try
             {
-                if (args != null && args.Length > 0 && File.Exists(args[0]))
-                    ConfigPath = args[0];
-
-                LoadConfig();
+                var cfg = ConfigClient.FetchConfig(ApiBase);
+                if (cfg.Count == 0) { LogHelper.Error("获取配置失败"); return; }
+                LoadRacks(cfg);
 
                 if (Racks.Count == 0)
                 {
@@ -118,77 +103,65 @@ namespace rackoperate
         }
 
         // ==================== 加载配置 ====================
-        static void LoadConfig()
+        
+                static void LoadRacks(Dictionary<string, object> cfg)
         {
             try
             {
-                if (!File.Exists(ConfigPath)) { LogHelper.Warn( "配置文件不存在: " + ConfigPath); return; }
-                var cfg = Js.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
-
-                if (cfg.ContainsKey("database"))
-                {
-                    var db = GetDict(cfg, "database");
-                    string host = GetStr(db, "host", "localhost");
-                    string dbname = GetStr(db, "database", "qianduantest");
-                    string user = GetStr(db, "user", "root");
-                    string pwd = GetStr(db, "password", "123456");
-                    DbType = GetStr(db, "type", "mysql").ToLower();
-                    if (DbType == "sqlserver")
-                        ConnStr = $"Server={host},{GetInt(db, "port", 1433)};Database={dbname};User Id={user};Password={pwd};";
-                    else
-                        ConnStr = $"Server={host};Port={GetInt(db, "port", 3306)};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
-                }
-
-                if (cfg.ContainsKey("plc"))
-                {
-                    var plc = GetDict(cfg, "plc");
-                    PlcIp = GetStr(plc, "ip", PlcIp);
-                    PlcPort = GetInt(plc, "port", PlcPort);
-                    var signalsSrc = GetDict(plc, "signals");
-                    var addrFallback = GetDict(plc, "addresses");
-                    var hasSignals = signalsSrc.Count > 0;
-                    if (hasSignals)
-                        RobotTaskDoneAddr = GetStr(GetDict(signalsSrc, "robot"), "taskDone", "");
-                    else
-                        RobotTaskDoneAddr = GetStr(addrFallback, "task_complete_signal", "");
-                }
-
                 Racks.Clear();
-                if (cfg.ContainsKey("racks") && cfg["racks"] != null)
+                var racksRaw = cfg.ContainsKey("racks") ? cfg["racks"] : null;
+                if (racksRaw == null)
                 {
-                    var racksList = cfg["racks"];
-                    if (racksList is System.Collections.ArrayList al)
-                        foreach (var item in al) { var r = item as Dictionary<string, object>; if (r != null) Racks.Add(ParseRackConfig(r)); }
-                    else if (racksList is object[] arr)
-                        foreach (var item in arr) { var r = item as Dictionary<string, object>; if (r != null) Racks.Add(ParseRackConfig(r)); }
-                    else if (racksList is IEnumerable<object> ie)
-                        foreach (var item in ie) { var r = item as Dictionary<string, object>; if (r != null) Racks.Add(ParseRackConfig(r)); }
+                    LogHelper.Warn("配置文件中没有 racks 节点");
+                    return;
                 }
-
-                LogHelper.Info( string.Format("配置加载完成: PLC={0}:{1}, 料架数={2}, 机器人任务完成信号={3}",
-                    PlcIp, PlcPort, Racks.Count, RobotTaskDoneAddr));
+                var racksList = new List<object>();
+                if (racksRaw is System.Collections.ArrayList al)
+                {
+                    foreach (var item in al)
+                        racksList.Add(item);
+                }
+                else if (racksRaw is object[] arr)
+                {
+                    foreach (var item in arr)
+                        racksList.Add(item);
+                }
+                else
+                {
+                    LogHelper.Warn("racks 配置格式错误，跳过");
+                    return;
+                }
+                foreach (var item in racksList)
+                {
+                    if (item is Dictionary<string, object> r)
+                        Racks.Add(ParseRackConfig(r));
+                }
+                LogHelper.Info("加载料架配置完成，共 " + Racks.Count + " 个料架");
             }
-            catch (Exception ex) { LogHelper.Warn( "加载配置失败: " + ex.Message); }
+            catch (Exception ex)
+            {
+                LogHelper.Warn("加载料架配置失败: " + ex.Message);
+            }
         }
 
-        static RackConfig ParseRackConfig(Dictionary<string, object> r)
+static RackConfig ParseRackConfig(Dictionary<string, object> r)
         {
             return new RackConfig
             {
-                Id = GetStr(r, "id", ""),
-                Type = GetStr(r, "type", "steel"),
-                Name = GetStr(r, "name", "未知料架"),
-                Number = GetStr(r, "number", ""),
-                Rows = GetInt(r, "rows", 3),
-                Cols = GetInt(r, "cols", 6),
-                PhotoSignal = GetStr(r, "photoSignal", ""),
-                OpenRequest = GetStr(r, "openRequest", ""),
-                OpenAllow = GetStr(r, "openSignal", ""),
-                DoorClosed = GetStr(r, "doorClosed", ""),
-                DoorFlag = GetStr(r, "doorFlag", ""),
-                GrabStartTaskNo = GetStr(r, "grabStartTaskNo", ""),
-                PlaceStartTaskNo = GetStr(r, "placeStartTaskNo", ""),
-                ScanStartTaskNo = GetStr(r, "scanStartTaskNo", "")
+                Id = ConfigClient.GetStr(r, "id", ""),
+                Type = ConfigClient.GetStr(r, "type", "steel"),
+                Name = ConfigClient.GetStr(r, "name", "未知料架"),
+                Number = ConfigClient.GetStr(r, "number", ""),
+                Rows = ConfigClient.GetInt(r, "rows", 3),
+                Cols = ConfigClient.GetInt(r, "cols", 6),
+                PhotoSignal = ConfigClient.GetStr(r, "photoSignal", ""),
+                OpenRequest = ConfigClient.GetStr(r, "openRequest", ""),
+                OpenAllow = ConfigClient.GetStr(r, "openSignal", ""),
+                DoorClosed = ConfigClient.GetStr(r, "doorClosed", ""),
+                DoorFlag = ConfigClient.GetStr(r, "doorFlag", ""),
+                GrabStartTaskNo = ConfigClient.GetStr(r, "grabStartTaskNo", ""),
+                PlaceStartTaskNo = ConfigClient.GetStr(r, "placeStartTaskNo", ""),
+                ScanStartTaskNo = ConfigClient.GetStr(r, "scanStartTaskNo", "")
             };
         }
 
@@ -205,7 +178,7 @@ namespace rackoperate
 
             // 停止标志文件
             StopFlagFile = Path.Combine(
-                Path.GetDirectoryName(ConfigPath) ?? AppDomain.CurrentDomain.BaseDirectory,
+                AppDomain.CurrentDomain.BaseDirectory,
                 "stop_rackoperate.flag");
 
             try
@@ -570,16 +543,6 @@ namespace rackoperate
 
 
         // ==================== 辅助 ====================
-        static Dictionary<string, object> GetDict(Dictionary<string, object> d, string key)
-        {
-            if (!d.ContainsKey(key) || d[key] == null) return new Dictionary<string, object>();
-            if (d[key] is Dictionary<string, object> n) return n;
-            try { return Js.Deserialize<Dictionary<string, object>>(d[key].ToString()) ?? new Dictionary<string, object>(); }
-            catch { return new Dictionary<string, object>(); }
-        }
-        static string GetStr(Dictionary<string, object> d, string key, string def = "") =>
-            d.ContainsKey(key) && d[key] != null ? d[key].ToString() : def;
-        static int GetInt(Dictionary<string, object> d, string key, int def = 0) =>
-            d.ContainsKey(key) && d[key] != null ? Convert.ToInt32(d[key]) : def;
-    }
+        
+}
 }

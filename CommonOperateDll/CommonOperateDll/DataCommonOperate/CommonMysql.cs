@@ -80,7 +80,6 @@ namespace DataCommonOperate
                     mycmd.CommandType = System.Data.CommandType.Text;
                     mycmd.CommandText = str;
                     mycmd.ExecuteNonQuery();
-                    mycmd.Dispose();
                     return true;
                 }
                 else
@@ -111,7 +110,6 @@ namespace DataCommonOperate
                 mycmd.CommandType = System.Data.CommandType.Text;
                 mycmd.CommandText = str;
                 int hangshu = mycmd.ExecuteNonQuery();
-                mycmd.Dispose();
                 return hangshu;
             }
             catch (MySqlException ex)

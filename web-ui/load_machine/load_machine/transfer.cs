@@ -287,7 +287,7 @@ namespace load_machine
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[ReadExcelCell] 异常: " + ex.Message);
+                LogHelper.Warn("[ReadExcelCell] 异常: " + ex.Message);
                 return "";
             }
         }

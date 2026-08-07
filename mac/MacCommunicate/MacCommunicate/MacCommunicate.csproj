@@ -70,7 +70,9 @@
     <Compile Include="rodersoperate\RodersErp.cs" />
     <Compile Include="Roderss.cs" />
     <Compile Include="Siemence.cs" />
+    <Compile Include="IFileTransferService.cs" />
     <Compile Include="Siemensoperate.cs" />
+    <Compile Include="WinScpFileTransferService.cs" />
     <Compile Include="transformpro.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
