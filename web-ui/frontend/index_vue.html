@@ -120,8 +120,56 @@
       <section id="shelves" class="section" :class="{ active: currentSection === 'shelves' }">
         <div style="display:flex;align-items:center;justify-content:center;height:300px;color:#999;font-size:18px;">板块迁移中 — 料架管理</div>
       </section>
-      <section id="logs" class="section" :class="{ active: currentSection === 'logs' }">
-        <div style="display:flex;align-items:center;justify-content:center;height:300px;color:#999;font-size:18px;">板块迁移中 — 日志查询</div>
+            <section id="logs" class="section" :class="{ active: currentSection === 'logs' }">
+        <div class="log-toolbar">
+          <div class="log-filters">
+            <label>开始时间: <input v-model="logStartTime" type="datetime-local"></label>
+            <label>结束时间: <input v-model="logEndTime" type="datetime-local"></label>
+            <label>日志类型:
+              <select v-model="logTypeFilter">
+                <option value="">全部</option>
+                <option value="INFO">系统日志</option>
+                <option value="SUCCESS">成功日志</option>
+                <option value="WARN">警告日志</option>
+                <option value="ERROR">错误日志</option>
+                <option value="DEBUG">调试日志</option>
+              </select>
+            </label>
+            <label>关键字: <input v-model="logKeyword" type="text" placeholder="请输入关键字" @keyup.enter="applyLogFilter"></label>
+            <button class="small-btn" @click="applyLogFilter">查询</button>
+            <button class="small-btn" @click="resetLogFilter">重置</button>
+          </div>
+        </div>
+        <div class="log-table-wrap">
+          <table id="log-table" class="log-table">
+            <thead>
+              <tr>
+                <th class="col-no">序号</th>
+                <th>时间</th>
+                <th>日志类型</th>
+                <th>内容</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, idx) in logPagedData" :key="row.id">
+                <td class="col-no">{{ logStartIdx + idx + 1 }}</td>
+                <td>{{ row.time }}</td>
+                <td><span class="log-type-badge" :class="row.typeClass">{{ row.typeText }}</span></td>
+                <td class="log-message">{{ row.content }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="log-footer">
+          <div class="pager">
+            <button class="icon-btn" @click="logGoPage(logCurrentPage - 1)" :disabled="logCurrentPage <= 1">◀</button>
+            <div class="page-numbers">
+              <button v-for="p in logPages" :key="p" :class="{ active: p === logCurrentPage }" @click="logGoPage(p)">{{ p }}</button>
+            </div>
+            <button class="icon-btn" @click="logGoPage(logCurrentPage + 1)" :disabled="logCurrentPage >= logPages">▶</button>
+          </div>
+          <div class="pager-info">每页显示 {{ LOG_PAGE_SIZE }} 条</div>
+        </div>
       </section>
       <section id="lineconfig" class="section" :class="{ active: currentSection === 'lineconfig' }">
         <div style="display:flex;align-items:center;justify-content:center;height:300px;color:#999;font-size:18px;">板块迁移中 — 线体配置</div>

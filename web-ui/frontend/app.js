@@ -18,9 +18,25 @@ new Vue({
     pollTimer: null,
     wfTimer: null,
     logTimer: null,
-    clockTimer: null
+    clockTimer: null,
+    // 日志查询板块
+    LOG_PAGE_SIZE: 50,
+    logData: [],
+    logFilteredData: [],
+    logCurrentPage: 1,
+    logStartTime: '',
+    logEndTime: '',
+    logTypeFilter: '',
+    logKeyword: ''
   },
   computed: {
+    logPages() {
+      return Math.max(1, Math.ceil(this.logFilteredData.length / this.LOG_PAGE_SIZE));
+    },
+    logStartIdx() { return (this.logCurrentPage - 1) * this.LOG_PAGE_SIZE; },
+    logPagedData() {
+      return this.logFilteredData.slice(this.logStartIdx, this.logStartIdx + this.LOG_PAGE_SIZE);
+    },
     isWorkflowRunning() { return this.workflowState === 'running'; },
     isWorkflowPaused() { return this.workflowState === 'paused'; },
     isWorkflowIdle() { return this.workflowState === 'idle'; }
@@ -31,7 +47,10 @@ new Vue({
       var map = { '正常': 'normal', '运行': 'running', '暂停': 'paused', '停止': 'stopped', '自动': 'auto' };
       return map[status] || 'normal';
     },
-    switchSection(s) { this.currentSection = s; },
+    switchSection(s) {
+      this.currentSection = s;
+      if (s === 'logs' && this.logData.length === 0) this.loadLogs();
+    },
     updateTime() {
       var now = new Date();
       this.datetime = now.getFullYear() + '-' + this.pad(now.getMonth() + 1) + '-' + this.pad(now.getDate()) +
@@ -111,6 +130,59 @@ new Vue({
       } catch (e) { /* silent */ }
     },
     clearHomeLog() { this.homeLog = []; },
+    // ==================== 日志查询板块 ====================
+    logTypeMap(type) {
+      var map = { INFO: ['系统日志', 'type-system'], ROBOT: ['机器人日志', 'type-robot'], ERROR: ['错误日志', 'type-error'], WARN: ['警告日志', 'type-warn'], SUCCESS: ['成功日志', 'type-success'], DEBUG: ['调试日志', 'type-debug'] };
+      var pair = map[type] || [type || 'INFO', ''];
+      return { text: pair[0], cls: pair[1] };
+    },
+    async loadLogs() {
+      try {
+        var res = await apiGet('/api/logs?page=1&pageSize=500');
+        if (!res.success || !res.data || !res.data.logs) return;
+        var self = this;
+        this.logData = res.data.logs.map(function(log, i) {
+          var t = self.logTypeMap(log.level);
+          return {
+            id: i + 1,
+            time: log.time || '',
+            type: log.level || 'INFO',
+            typeText: t.text,
+            typeClass: t.cls,
+            content: log.content || log.message || ''
+          };
+        });
+        this.logFilteredData = this.logData.slice();
+        this.logCurrentPage = 1;
+      } catch (e) { /* silent */ }
+    },
+    applyLogFilter() {
+      var sv = this.logStartTime ? new Date(this.logStartTime.replace('T', ' ')).getTime() : null;
+      var ev = this.logEndTime ? new Date(this.logEndTime.replace('T', ' ')).getTime() : null;
+      var tv = this.logTypeFilter;
+      var kv = this.logKeyword.trim().toLowerCase();
+      var self = this;
+      this.logFilteredData = this.logData.filter(function(item) {
+        var t = item.time ? new Date(item.time.replace(/-/g, '/')).getTime() : null;
+        if (sv && (!t || t < sv)) return false;
+        if (ev && (!t || t > ev)) return false;
+        if (tv && item.type !== tv) return false;
+        if (kv && !(item.content || '').toLowerCase().includes(kv)) return false;
+        return true;
+      });
+      this.logCurrentPage = 1;
+    },
+    resetLogFilter() {
+      this.logStartTime = '';
+      this.logEndTime = '';
+      this.logTypeFilter = '';
+      this.logKeyword = '';
+      this.logFilteredData = this.logData.slice();
+      this.logCurrentPage = 1;
+    },
+    logGoPage(p) {
+      if (p >= 1 && p <= this.logPages) this.logCurrentPage = p;
+    },
     startPolling() {
       this.loadDashboard();
       this.syncWorkflowStatus();
@@ -129,6 +201,7 @@ new Vue({
     var stored = localStorage.getItem('demo_username');
     this.username = stored || '白晓乾';
     this.startPolling();
+    this.loadLogs();
     this.clockTimer = setInterval(this.updateTime, 1000);
     this.updateTime();
   },
