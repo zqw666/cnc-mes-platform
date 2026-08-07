@@ -356,7 +356,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ==================== 时钟 ====================
-  function pad(n) { return n < 10 ? '0' + n : n; }
   function updateTime() {
     const now = new Date();
     document.getElementById('datetime').textContent =
@@ -406,13 +405,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ==================== 状态文字映射 ====================
-  function setStatus(el, state) {
-    el.classList.remove('normal', 'running', 'paused', 'stopped', 'auto');
-    const map = { '正常': 'normal', '运行': 'running', '暂停': 'paused', '停止': 'stopped', '自动': 'auto' };
-    if (map[state]) el.classList.add(map[state]);
-    el.textContent = state;
-  }
-
   // ==================== 首页：刷新仪表盘 ====================
   async function refreshDashboard() {
     try {
@@ -1071,11 +1063,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // addHomeLog 函数已由 addHomeLogFromApi 替代
 
   // HTML转义函数
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 
   // 清空主界面日志
   function clearHomeLog() {
