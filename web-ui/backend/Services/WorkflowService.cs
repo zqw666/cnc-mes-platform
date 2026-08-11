@@ -151,7 +151,10 @@ namespace MachineMonitor
                     }
 
                     LogHelper.Info("[Workflow] 开始执行步骤: " + step.DisplayName);
+                    UpdateStepStatus(step.Name, step.DisplayName, "running", "执行中");
                     await RunSubProcess(step.Name, step.DisplayName, ct);
+                    if (!ct.IsCancellationRequested)
+                        UpdateStepStatus(step.Name, step.DisplayName, "completed", "执行完成");
                     LogHelper.Info("[Workflow] 步骤完成: " + step.DisplayName);
                 }
 
@@ -265,19 +268,34 @@ namespace MachineMonitor
             catch { }
         }
 
-        public static void UpdateStepStatus(string step, string status, string message)
+        public static void UpdateStepStatus(string step, string display, string status, string message)
         {
             try
             {
                 var db = DatabaseRepository.CreateDb();
                 string now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                string sql = "INSERT INTO process_status (workpiece_name, process_status, process_start_time) VALUES ("
-                    + SqlStr(step) + ", " + (status == "running" ? 1 : 2) + ", " + SqlStr(now) + ") "
-                    + "ON DUPLICATE KEY UPDATE process_status=" + (status == "running" ? 1 : 2)
-                    + ", process_end_time=" + (status == "completed" ? SqlStr(now) : "NULL");
-                db.ExecuteSql(sql);
+                if (AppState.DbType == "sqlserver")
+                {
+                    string sql = "IF NOT EXISTS (SELECT 1 FROM workflow_step WHERE step_name=" + SqlStr(step) + ") "
+                        + "INSERT INTO workflow_step (step_name, display_name, last_status, last_message, last_time) VALUES ("
+                        + SqlStr(step) + ", " + SqlStr(display) + ", " + SqlStr(status) + ", " + SqlStr(message) + ", " + SqlStr(now) + ") "
+                        + "ELSE UPDATE workflow_step SET display_name=" + SqlStr(display) + ", last_status=" + SqlStr(status)
+                        + ", last_message=" + SqlStr(message) + ", last_time=" + SqlStr(now) + " WHERE step_name=" + SqlStr(step);
+                    db.ExecuteSql(sql);
+                }
+                else
+                {
+                    string sql = "INSERT INTO workflow_step (step_name, display_name, last_status, last_message, last_time) VALUES ("
+                        + SqlStr(step) + ", " + SqlStr(display) + ", " + SqlStr(status) + ", " + SqlStr(message) + ", " + SqlStr(now) + ") "
+                        + "ON DUPLICATE KEY UPDATE display_name=" + SqlStr(display) + ", last_status=" + SqlStr(status)
+                        + ", last_message=" + SqlStr(message) + ", last_time=" + SqlStr(now);
+                    db.ExecuteSql(sql);
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogHelper.Warn("[Workflow] 更新步骤状态失败: " + ex.Message);
+            }
         }
 
         static string SqlStr(string val)

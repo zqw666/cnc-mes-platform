@@ -32,7 +32,7 @@ namespace MachineMonitor
                 string[] requiredTables = {
                     "macmessage", "macworkposstatus", "process_flow", "process_status",
                     "work_flow", "robotmessage", "following_rack", "rack_administrate",
-                    "grippers", "knife_rack", "workflow_log"
+                    "grippers", "knife_rack", "workflow_log", "workflow_step"
                 };
                 foreach (var table in requiredTables)
                 {
@@ -151,6 +151,7 @@ namespace MachineMonitor
                 if (tableName == "work_flow") return "CREATE TABLE work_flow (id INT IDENTITY(1,1) PRIMARY KEY, processname NVARCHAR(100), status INT DEFAULT 1, priority INT DEFAULT 0)";
                 if (tableName == "process_status") return "CREATE TABLE process_status (id INT IDENTITY(1,1) PRIMARY KEY, process_name NVARCHAR(100), process_status INT, process_start_time DATETIME, process_end_time DATETIME NULL)";
                 if (tableName == "workflow_log") return "CREATE TABLE workflow_log (id INT IDENTITY(1,1) PRIMARY KEY, step_name NVARCHAR(100), level NVARCHAR(20), content NVARCHAR(MAX), created_at DATETIME DEFAULT GETDATE())";
+                if (tableName == "workflow_step") return "CREATE TABLE workflow_step (id INT IDENTITY(1,1) PRIMARY KEY, step_name NVARCHAR(100) NOT NULL UNIQUE, display_name NVARCHAR(200) DEFAULT '', last_status NVARCHAR(20) DEFAULT 'idle', last_message NVARCHAR(500) DEFAULT '', last_time DATETIME NULL)";
             }
             else
             {
@@ -159,6 +160,7 @@ namespace MachineMonitor
                 if (tableName == "work_flow") return "CREATE TABLE IF NOT EXISTS work_flow (id INT AUTO_INCREMENT PRIMARY KEY, processname VARCHAR(100), status INT DEFAULT 1, priority INT DEFAULT 0)";
                 if (tableName == "process_status") return "CREATE TABLE IF NOT EXISTS process_status (id INT AUTO_INCREMENT PRIMARY KEY, process_name VARCHAR(100), process_status INT, process_start_time DATETIME, process_end_time DATETIME NULL)";
                 if (tableName == "workflow_log") return "CREATE TABLE IF NOT EXISTS workflow_log (id INT AUTO_INCREMENT PRIMARY KEY, step_name VARCHAR(100), level VARCHAR(20), content TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
+                if (tableName == "workflow_step") return "CREATE TABLE IF NOT EXISTS workflow_step (id INT AUTO_INCREMENT PRIMARY KEY, step_name VARCHAR(100) NOT NULL UNIQUE, display_name VARCHAR(200) DEFAULT '', last_status VARCHAR(20) DEFAULT 'idle', last_message VARCHAR(500) DEFAULT '', last_time DATETIME NULL)";
                 if (tableName == "rack_administrate") return "CREATE TABLE IF NOT EXISTS rack_administrate (id INT PRIMARY KEY, racknum INT DEFAULT 1, racktype VARCHAR(50) DEFAULT 'steel', name VARCHAR(100) DEFAULT '', rows INT DEFAULT 0, cols INT DEFAULT 0, scanstatus INT DEFAULT 0, posstatus INT DEFAULT 1, workstate INT DEFAULT 0, rfid VARCHAR(100) DEFAULT '', verifyid VARCHAR(100) DEFAULT '', priority INT DEFAULT 0, workpiecename VARCHAR(255) NULL, materialname VARCHAR(255) NULL, programname VARCHAR(255) NULL)";
                 if (tableName == "knife_rack") return "CREATE TABLE IF NOT EXISTS knife_rack (id INT PRIMARY KEY, rfid VARCHAR(100) DEFAULT '', posstatus INT DEFAULT 0, workstate INT DEFAULT 0)";
                 if (tableName == "grippers") return "CREATE TABLE IF NOT EXISTS grippers (id VARCHAR(100) PRIMARY KEY, type VARCHAR(50) DEFAULT 'steel', name VARCHAR(100) DEFAULT '', number VARCHAR(10) DEFAULT '1', slotPhotoSignal VARCHAR(50) DEFAULT '', grabTaskNo VARCHAR(50) DEFAULT '', placeTaskNo VARCHAR(50) DEFAULT '')";
