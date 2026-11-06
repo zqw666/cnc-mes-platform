@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <PlatformTarget>AnyCPU</PlatformTarget>
-    <OutputPath>bin/Any CPU/Debug/net48/</OutputPath>
+    <OutputPath>bin/Any CPU/Debug/net472/</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
   <ItemGroup>
@@ -25,6 +25,9 @@
     <None Update="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="node-types.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <!-- 排除所有子程序目录，避免编译冲突 -->
   <ItemGroup>
@@ -32,4 +35,12 @@
     <Compile Remove="obj\**" />
     <Compile Remove="subs\**" />
   </ItemGroup>
+  <!-- 构建后自动复制前端文件到输出目录 -->
+  <Target Name="CopyFrontend" AfterTargets="Build">
+    <ItemGroup>
+      <!-- _proto 是选型阶段的弃用原型（含 amis 版），不进部署包，避免误投放和第三方许可证问题 -->
+      <FrontendFiles Include="..\frontend\**\*.*" Exclude="..\frontend\**\*.bak;..\frontend\**\*.bak-*;..\frontend\**\obj\**;..\frontend\**\bin\**;..\frontend\**\_proto\**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FrontendFiles)" DestinationFiles="@(FrontendFiles->'$(OutputPath)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

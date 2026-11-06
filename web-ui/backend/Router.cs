@@ -40,10 +40,34 @@ namespace MachineMonitor
                 }
                 else if (path == "/api/dashboard")
                     result = DashboardController.GetDashboard();
+                else if (path == "/api/node-types")
+                    result = NodeTypeController.GetRaw();
+                else if (path == "/api/node-types/save")
+                    result = NodeTypeController.Save(raw);
+                else if (path == "/api/flows")
+                    result = FlowTemplateService.List();
+                else if (path == "/api/flows/create")
+                    result = FlowTemplateService.Create(raw);
+                else if (path == "/api/flows/switch")
+                    result = FlowTemplateService.Switch(raw);
+                else if (path == "/api/flows/delete")
+                    result = FlowTemplateService.Delete(raw);
+                else if (path == "/api/flows/rename")
+                    result = FlowTemplateService.Rename(raw);
                 else if (path == "/api/logs")
                     result = LogController.GetLogs(raw);
                 else if (path == "/api/workflow/status")
                     result = WorkflowController.GetStatus();
+                else if (path == "/api/workflow/steps")
+                    result = WorkflowController.GetSteps();
+                else if (path == "/api/workflow/save")
+                    result = WorkflowController.Save(raw);
+                else if (path == "/api/workflow/plan")
+                    result = WorkflowController.GetPlan();
+                else if (path == "/api/workflow/plan/save")
+                    result = WorkflowController.SavePlan(raw);
+                else if (path == "/api/workflow/plan/start")
+                    result = WorkflowController.SavePlanAndStart(raw);
                 else if (path == "/api/workflow/start")
                     result = WorkflowController.Start(raw);
                 else if (path == "/api/workflow/stop")
@@ -56,6 +80,8 @@ namespace MachineMonitor
                     result = MachineController.ControlMachine(path.Substring("/api/machine/".Length), raw);
                 else if (path == "/api/rack/status")
                     result = method == "GET" ? RackController.GetRackStatus() : RackController.UpdateRackStatus(raw);
+                else if (path == "/api/rack/notify")
+                    result = RackController.NotifyRackChanged(raw);
                 else if (path == "/api/rack/create")
                     result = RackController.CreateRack(raw);
                 else if (path == "/api/machine/create")
@@ -66,6 +92,8 @@ namespace MachineMonitor
                     result = method == "GET" ? ConfigController.GetConfig() : ConfigController.SaveConfig(raw);
                 else if (path == "/api/config/raw")
                     result = ConfigController.GetConfigRaw();
+                else if (path == "/api/config/raw-save")
+                    result = ConfigController.SaveConfigRaw(raw);
                 else if (path == "/api/config/debug")
                     result = ConfigController.Debug(raw);
                 else

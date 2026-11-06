@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "updatedAt": "2026-11-04",
+  "desc": "环节元数据。前端环节库、属性面板、后端校验都从这一份读取。新增环节只改这里，不改代码。",
+  "groups": [
+    {
+      "key": "scan",
+      "name": "扫描与料架",
+      "icon": "scan"
+    },
+    {
+      "key": "load",
+      "name": "上料与装夹",
+      "icon": "down"
+    },
+    {
+      "key": "unload",
+      "name": "下料与卸料",
+      "icon": "up"
+    },
+    {
+      "key": "knife",
+      "name": "刀具管理",
+      "icon": "wrench"
+    }
+  ],
+  "commonFields": [
+    {
+      "name": "timeoutSec",
+      "type": "number",
+      "label": "超时",
+      "unit": "秒",
+      "default": 300,
+      "min": 10,
+      "max": 3600,
+      "hint": "超过这个时间仍未结束就按失败处理"
+    },
+    {
+      "name": "onFail",
+      "type": "enum",
+      "label": "失败后",
+      "default": "stop",
+      "options": [
+        {
+          "value": "stop",
+          "label": "停在当前步"
+        },
+        {
+          "value": "skip",
+          "label": "跳过继续"
+        }
+      ],
+      "hint": "取值必须是 stop 或 skip，后端只认这两个；轮播模式下强制终止"
+    },
+    {
+      "name": "simMs",
+      "type": "number",
+      "label": "仿真耗时",
+      "unit": "毫秒",
+      "default": 3000,
+      "min": 0,
+      "max": 60000,
+      "hint": "仅仿真模式使用，模拟这一步要跑多久"
+    },
+    {
+      "name": "simFail",
+      "type": "switch",
+      "label": "模拟失败",
+      "default": false,
+      "hint": "仅仿真模式使用，用来验证失败策略"
+    }
+  ],
+  "nodes": [
+    {
+      "key": "scan_preset",
+      "display": "扫描预设台流程",
+      "group": "scan",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "rackoperate",
+      "display": "料架操作",
+      "group": "scan",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "scan",
+      "display": "扫描流程",
+      "group": "scan",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "prepare_material",
+      "display": "备料流程",
+      "group": "load",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "load_machine",
+      "display": "上机流程",
+      "group": "load",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "change_machine",
+      "display": "换料流程",
+      "group": "load",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "unload_machine",
+      "display": "下机流程",
+      "group": "unload",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "unload_material",
+      "display": "下料流程",
+      "group": "unload",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "load_aluminum",
+      "display": "铝板电极上机流程",
+      "group": "load",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "fill_fixture",
+      "display": "空夹具补充",
+      "group": "load",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "unload_aluminum",
+      "display": "铝板电极下机流程",
+      "group": "unload",
+      "enabledByDefault": true,
+      "fields": []
+    },
+    {
+      "key": "change_knife",
+      "display": "换刀",
+      "group": "knife",
+      "enabledByDefault": false,
+      "fields": []
+    },
+    {
+      "key": "prepare_knife",
+      "display": "备刀",
+      "group": "knife",
+      "enabledByDefault": false,
+      "fields": []
+    },
+    {
+      "key": "sendkniferequest",
+      "display": "发送换刀请求",
+      "group": "knife",
+      "enabledByDefault": false,
+      "fields": []
+    }
+  ]
+}

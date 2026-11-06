@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>系统参数 - MachineMonitor</title>
+<style>
+  :root{
+    --primary:#1677ff; --primary-bg:#e6f4ff; --primary-border:#91caff;
+    --bg:#f5f5f5; --container:#fff;
+    --border:#f0f0f0; --border-2:#d9d9d9;
+    --text:rgba(0,0,0,.88); --text-2:rgba(0,0,0,.65);
+    --text-3:rgba(0,0,0,.45); --text-4:rgba(0,0,0,.25);
+    --success:#52c41a; --success-bg:#f6ffed; --success-border:#b7eb8f;
+    --error:#ff4d4f;   --error-bg:#fff2f0;   --error-border:#ffccc7;
+    --warning:#faad14; --warning-bg:#fffbe6; --warning-border:#ffe58f;
+    --radius:8px; --radius-sm:6px;
+    --shadow:0 1px 2px 0 rgba(0,0,0,.03), 0 1px 6px -1px rgba(0,0,0,.02);
+    --shadow-lg:0 6px 16px 0 rgba(0,0,0,.08);
+    --header:48px; --side:186px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;
+    font-size:14px;color:var(--text);-webkit-font-smoothing:antialiased;}
+  button{font-family:inherit;}
+
+  .topbar{height:var(--header);background:var(--container);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:12px;padding:0 16px;}
+  .topbar .back{width:28px;height:28px;border:none;background:transparent;border-radius:var(--radius-sm);
+    display:grid;place-items:center;cursor:pointer;color:var(--text-2);text-decoration:none;font-size:18px;}
+  .topbar .back:hover{background:#f5f5f5;}
+  .topbar .title{font-size:15px;font-weight:600;}
+  .topbar .divider{width:1px;height:16px;background:var(--border-2);}
+  .topbar .crumb{font-size:13px;color:var(--text-3);font-family:ui-monospace,Consolas,monospace;}
+  .topbar .spacer{flex:1;}
+
+  .btn{height:32px;padding:0 15px;border-radius:var(--radius-sm);border:1px solid var(--border-2);
+    background:var(--container);color:var(--text);font-size:14px;cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;transition:all .2s;}
+  .btn:hover{border-color:var(--primary);color:var(--primary);}
+  .btn-primary{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .btn-primary:hover{background:#4096ff;border-color:#4096ff;color:#fff;}
+  .btn[disabled]{opacity:.5;cursor:not-allowed;}
+  .btn.small{height:28px;padding:0 10px;font-size:13px;}
+  .btn.danger{color:var(--error);border-color:var(--error-border);}
+  .btn.danger:hover{background:var(--error-bg);border-color:var(--error);color:var(--error);}
+
+  .dirty{font-size:12px;color:#d48806;background:var(--warning-bg);border:1px solid var(--warning-border);
+    padding:2px 8px;border-radius:10px;}
+  .sync{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);cursor:pointer;}
+  .sync input{width:15px;height:15px;accent-color:var(--primary);}
+
+  .body{height:calc(100% - var(--header));display:grid;grid-template-columns:var(--side) minmax(0,1fr);}
+
+  .side{background:var(--container);border-right:1px solid var(--border);overflow-y:auto;padding:10px 8px;}
+  .tab{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:var(--radius-sm);
+    cursor:pointer;font-size:13.5px;color:var(--text-2);margin-bottom:2px;border:1px solid transparent;}
+  .tab:hover{background:#fafafa;}
+  .tab.on{background:var(--primary-bg);border-color:var(--primary-border);color:var(--primary);font-weight:500;}
+  .tab .badge{margin-left:auto;font-size:11px;color:var(--warning);}
+
+  .main{overflow-y:auto;padding:20px 24px 90px;}
+  .wrap{max-width:960px;margin:0 auto;}
+  .card{background:var(--container);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px 18px;margin-bottom:16px;}
+  .card-h{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .card-h h3{margin:0;font-size:14px;font-weight:600;}
+  .card-h .spacer{flex:1;}
+  .card-desc{font-size:12px;color:var(--text-3);margin-bottom:14px;line-height:1.6;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;}
+  .grid.one{grid-template-columns:1fr;}
+  .fld{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .fld.wide{grid-column:1/-1;}
+  .fld>label{font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:4px;}
+  .fld>label .req{color:var(--error);font-weight:400;}
+  .fld>label i{font-style:normal;color:var(--text-4);}
+  .fld input,.fld select{
+    height:32px;padding:0 10px;border:1px solid var(--border-2);border-radius:var(--radius-sm);
+    font-size:13px;font-family:inherit;color:var(--text);background:var(--container);width:100%;}
+  .fld input.mono{font-family:ui-monospace,Consolas,monospace;letter-spacing:.3px;}
+  .fld input:focus,.fld select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(22,119,255,.1);}
+  .fld input.bad{border-color:var(--error);background:var(--error-bg);}
+  .fld .hint{font-size:11px;color:var(--text-4);line-height:1.45;}
+  .sw{display:inline-flex;align-items:center;gap:7px;height:32px;font-size:13px;color:var(--text-2);cursor:pointer;}
+  .sw input{width:15px;height:15px;accent-color:var(--primary);}
+
+  .item{border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px;background:#fcfcfc;}
+  .item-h{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .item-h .idx{font-size:11px;color:#fff;background:var(--primary);border-radius:10px;padding:1px 8px;}
+  .item-h .nm{font-size:13px;font-weight:600;color:var(--text);}
+  .item-h .spacer{flex:1;}
+
+  .empty{text-align:center;color:var(--text-3);font-size:13px;padding:30px 0;}
+
+  .mask{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.45);display:none;place-items:center;z-index:60;}
+  .mask.on{display:grid;}
+  .dlg{width:860px;max-width:94vw;max-height:86vh;background:var(--container);border-radius:var(--radius);
+    box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;}
+  .dlg-h{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border);}
+  .dlg-h h3{margin:0;font-size:15px;font-weight:600;flex:1;}
+  .dlg-h .x{border:none;background:transparent;cursor:pointer;color:var(--text-3);font-size:20px;line-height:1;}
+  .dlg-b{padding:14px 18px;overflow:auto;display:flex;flex-direction:column;gap:10px;}
+  .dlg-b textarea{width:100%;height:54vh;padding:10px;border:1px solid var(--border-2);border-radius:var(--radius-sm);
+    font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.55;resize:none;color:var(--text);}
+  .dlg-b textarea:focus{outline:none;border-color:var(--primary);}
+  .dlg-f{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+
+  #toast{position:fixed;left:50%;top:64px;transform:translateX(-50%);display:none;
+    padding:8px 18px;border-radius:6px;font-size:13px;z-index:99;box-shadow:var(--shadow-lg);max-width:70vw;}
+  #toast.ok{display:block;background:var(--success-bg);border:1px solid var(--success-border);color:#389e0d;}
+  #toast.err{display:block;background:var(--error-bg);border:1px solid var(--error-border);color:#cf1322;}
+
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#d9d9d9;border-radius:4px;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="back" href="workflow-designer.html" title="返回工序编排">&larr;</a>
+  <span class="title">系统参数</span>
+  <span class="divider"></span>
+  <span class="crumb">config.json</span>
+  <span class="dirty" id="dirtyTag" style="display:none">未保存</span>
+  <span class="spacer"></span>
+  <label class="sync" title="默认不勾选。subs/config.json 可能与主配置是完全不同的产线（本项目里一份是电极线、一份是钢件线），勾选前请先确认两边该一致。">
+    <input type="checkbox" id="syncSub">同步写 subs/config.json
+  </label>
+  <button class="btn" id="btnReload">重新加载</button>
+  <button class="btn" id="btnJson">JSON</button>
+  <button class="btn btn-primary" id="btnSave">保存</button>
+</header>
+
+<div class="body">
+  <aside class="side" id="tabs"></aside>
+  <main class="main" id="main"><div class="empty">加载中…</div></main>
+</div>
+
+<div class="mask" id="jsonMask">
+  <div class="dlg">
+    <div class="dlg-h"><h3>config.json 原文</h3><button class="x" id="jsonClose">&times;</button></div>
+    <div class="dlg-b">
+      <div style="font-size:12px;color:var(--text-3)">
+        这是即将写盘的完整内容。可以直接改，点「应用」会做 JSON 校验后回填到表单。
+      </div>
+      <textarea id="jsonText" spellcheck="false"></textarea>
+    </div>
+    <div class="dlg-f">
+      <button class="btn" id="jsonCancel">取消</button>
+      <button class="btn btn-primary" id="jsonApply">应用</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="config-schema.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  var SCHEMA = null, CFG = null, ORIG = null, TAB = '', DIRTY = false;
+
+  // ==================== 路径读写 ====================
+
+  function getPath(o, p) {
+    if (!p) return o;
+    var parts = p.split('.'), cur = o;
+    for (var i = 0; i < parts.length; i++) {
+      if (cur == null || typeof cur !== 'object') return undefined;
+      cur = cur[parts[i]];
+    }
+    return cur;
+  }
+
+  function setPath(o, p, v) {
+    if (!p) return;
+    var parts = p.split('.'), cur = o;
+    for (var i = 0; i < parts.length - 1; i++) {
+      var k = parts[i];
+      if (typeof cur[k] !== 'object' || cur[k] === null) cur[k] = {};
+      cur = cur[k];
+    }
+    cur[parts[parts.length - 1]] = v;
+  }
+
+  function fullPath(tab, f, groupKey) {
+    var base = tab.path || '';
+    if (groupKey) base = base ? base + '.' + groupKey : groupKey;
+    return base ? base + '.' + f.name : f.name;
+  }
+
+  function markDirty() { DIRTY = true; $('dirtyTag').style.display = ''; }
+  function clearDirty() { DIRTY = false; $('dirtyTag').style.display = 'none'; }
+
+  function toast(msg, ok) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = ok === false ? 'err' : 'ok';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.className = ''; }, 3000);
+  }
+
+  // ==================== 加载 ====================
+
+  function loadAll() {
+    SCHEMA = window.CONFIG_SCHEMA;
+    if (!SCHEMA || !SCHEMA.tabs) {
+      $('main').innerHTML = '<div class="empty">读不到配置结构定义<br>' +
+        '确认 config-schema.js 已随前端一起部署</div>';
+      return Promise.resolve();
+    }
+
+    return fetch('/api/config/raw', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.success) {
+          $('main').innerHTML = '<div class="empty">读取 config.json 失败：' +
+            esc((j && j.message) || '未知错误') + '</div>';
+          return;
+        }
+        CFG = j.data || {};
+        ORIG = JSON.parse(JSON.stringify(CFG));
+        if (!TAB) TAB = (SCHEMA.tabs[0] || {}).key;
+        clearDirty();
+        renderTabs();
+        renderMain();
+      })
+      .catch(function () {
+        $('main').innerHTML = '<div class="empty">读不到配置<br>确认主控程序已启动（端口 8888）</div>';
+      });
+  }
+
+  // ==================== 校验 ====================
+
+  var RE_IP = /^(\d{1,3}\.){3}\d{1,3}$/;
+  var RE_BIT = /^\d+\.\d{1,2}$/;      // 505.09 / 103.02
+  var RE_WORD = /^[A-Za-z]?\d+$/;     // D200 / 801 / 200
+
+  function checkField(f, v) {
+    var s = (v === undefined || v === null) ? '' : String(v).trim();
+    if (!s) return f.required ? '必填' : '';
+    if (f.type === 'ip') return RE_IP.test(s) ? '' : 'IP 格式不对，例 192.168.101.10';
+    if (f.type === 'addr') return (RE_BIT.test(s) || RE_WORD.test(s)) ? '' : '地址格式不对，例 505.09 / D200 / 801';
+    if (f.type === 'number' && isNaN(Number(s))) return '必须是数字';
+    return '';
+  }
+
+  // 收集所有地址类字段，找出重复占用
+  function collectAddrs() {
+    var map = {};
+    (SCHEMA.tabs || []).forEach(function (tab) {
+      if (tab.kind === 'matrix') {
+        (tab.groups || []).forEach(function (g) {
+          (g.fields || []).forEach(function (f) {
+            if (f.type !== 'addr') return;
+            var v = getPath(CFG, fullPath(tab, f, g.key));
+            if (!v) return;
+            var k = String(v).trim();
+            if (!k) return;
+            (map[k] = map[k] || []).push(tab.name + ' → ' + g.name + ' → ' + (f.label || f.name));
+          });
+        });
+      } else if (tab.kind === 'object') {
+        (tab.fields || []).forEach(function (f) {
+          if (f.type !== 'addr') return;
+          var v = getPath(CFG, fullPath(tab, f));
+          if (!v) return;
+          var k = String(v).trim();
+          if (!k) return;
+          (map[k] = map[k] || []).push(tab.name + ' → ' + (f.label || f.name));
+        });
+      }
+    });
+    return map;
+  }
+
+  function validate() {
+    var errs = [];
+    (SCHEMA.tabs || []).forEach(function (tab) {
+      var check = function (f, p, tag) {
+        var msg = checkField(f, getPath(CFG, p));
+        if (msg) errs.push(tag + ' · ' + (f.label || f.name) + '：' + msg);
+      };
+      if (tab.kind === 'object') {
+        (tab.fields || []).forEach(function (f) { check(f, fullPath(tab, f), tab.name); });
+      } else if (tab.kind === 'matrix') {
+        (tab.groups || []).forEach(function (g) {
+          (g.fields || []).forEach(function (f) { check(f, fullPath(tab, f, g.key), tab.name + '·' + g.name); });
+        });
+      } else if (tab.kind === 'list' || tab.kind === 'kvlist') {
+        var arr = getPath(CFG, tab.path);
+        Object.keys(arr || {}).forEach(function (k, i) {
+          (tab.fields || []).forEach(function (f) {
+            check(f, tab.path + '.' + k + '.' + f.name, tab.name + ' #' + (i + 1));
+          });
+        });
+      }
+    });
+
+    var dup = collectAddrs();
+    Object.keys(dup).forEach(function (addr) {
+      if (dup[addr].length > 1) {
+        errs.push('地址 ' + addr + ' 被多处占用：' + dup[addr].join('、'));
+      }
+    });
+    return errs;
+  }
+
+  // ==================== 渲染：左栏 ====================
+
+  function renderTabs() {
+    var html = '';
+    (SCHEMA.tabs || []).forEach(function (t) {
+      html += '<div class="tab' + (t.key === TAB ? ' on' : '') + '" data-t="' + esc(t.key) + '">' +
+        esc(t.name) + '</div>';
+    });
+    $('tabs').innerHTML = html;
+  }
+
+  // ==================== 渲染：控件 ====================
+
+  function ctrl(p, f, val) {
+    var v = (val === undefined || val === null) ? '' : val;
+    var attr = ' data-p="' + esc(p) + '"';
+    if (f.type === 'switch') {
+      return '<label class="sw"><input type="checkbox"' + attr + (v === true ? ' checked' : '') + '>' +
+        '<span>' + (v === true ? '开' : '关') + '</span></label>';
+    }
+    if (f.type === 'enum') {
+      var opts = '<option value="">（不设置）</option>' + (f.options || []).map(function (o) {
+        return '<option value="' + esc(o.value) + '"' + (o.value === v ? ' selected' : '') + '>' +
+          esc(o.label || o.value) + '</option>';
+      }).join('');
+      return '<select' + attr + '>' + opts + '</select>';
+    }
+    if (f.type === 'number') return '<input type="number"' + attr + ' value="' + esc(v) + '">';
+    if (f.type === 'password') return '<input type="password"' + attr + ' value="' + esc(v) + '" autocomplete="new-password">';
+    var cls = f.type === 'addr' ? ' class="mono"' : '';
+    return '<input' + cls + attr + ' value="' + esc(v) + '" spellcheck="false">';
+  }
+
+  function fieldHtml(p, f) {
+    var bad = checkField(f, getPath(CFG, p));
+    return '<div class="fld' + (f.wide ? ' wide' : '') + '">' +
+      '<label>' + esc(f.label || f.name) +
+        (f.required ? ' <b class="req">*</b>' : '') +
+        (f.unit ? ' <i>(' + esc(f.unit) + ')</i>' : '') + '</label>' +
+      ctrl(p, f, getPath(CFG, p)) +
+      (bad ? '<div class="hint" style="color:#cf1322">' + esc(bad) + '</div>'
+           : (f.hint ? '<div class="hint">' + esc(f.hint) + '</div>' : '')) +
+      '</div>';
+  }
+
+  // ==================== 渲染：右栏 ====================
+
+  function renderMain() {
+    var tab = null;
+    (SCHEMA.tabs || []).forEach(function (t) { if (t.key === TAB) tab = t; });
+    if (!tab) { $('main').innerHTML = '<div class="empty">左侧选一项</div>'; return; }
+
+    var html = '<div class="wrap">';
+
+    if (tab.kind === 'object') {
+      html += '<div class="card"><div class="card-h"><h3>' + esc(tab.name) + '</h3></div>' +
+        (tab.desc ? '<div class="card-desc">' + esc(tab.desc) + '</div>' : '') +
+        '<div class="grid">';
+      (tab.fields || []).forEach(function (f) { html += fieldHtml(fullPath(tab, f), f); });
+      html += '</div></div>';
+    }
+
+    else if (tab.kind === 'matrix') {
+      html += '<div class="card"><div class="card-h"><h3>' + esc(tab.name) + '</h3></div>' +
+        (tab.desc ? '<div class="card-desc">' + esc(tab.desc) + '</div>' : '') + '</div>';
+      (tab.groups || []).forEach(function (g) {
+        html += '<div class="card"><div class="card-h"><h3>' + esc(g.name) + '</h3>' +
+          '<span style="font-size:12px;color:var(--text-4)">' + esc(g.key) + '</span></div>' +
+          '<div class="grid">';
+        (g.fields || []).forEach(function (f) { html += fieldHtml(fullPath(tab, f, g.key), f); });
+        html += '</div></div>';
+      });
+    }
+
+    else if (tab.kind === 'kvlist') {
+      var obj = getPath(CFG, tab.path) || {};
+      html += '<div class="card"><div class="card-h"><h3>' + esc(tab.name) + '</h3>' +
+        '<span class="spacer"></span>' +
+        '<button class="btn small" data-act="addKV">+ 新增</button></div>' +
+        (tab.desc ? '<div class="card-desc">' + esc(tab.desc) + '</div>' : '');
+      var keys = Object.keys(obj);
+      if (!keys.length) html += '<div class="empty">还没有配置</div>';
+      keys.forEach(function (k, i) {
+        html += '<div class="item"><div class="item-h">' +
+          '<span class="idx">' + (i + 1) + '</span>' +
+          '<span class="nm">机床 ' + esc(obj[k].number || k) + '</span>' +
+          '<span class="spacer"></span>' +
+          '<button class="btn small danger" data-act="delKV" data-k="' + esc(k) + '">删除</button></div>' +
+          '<div class="grid">';
+        (tab.fields || []).forEach(function (f) {
+          html += fieldHtml(tab.path + '.' + k + '.' + f.name, f);
+        });
+        html += '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    else if (tab.kind === 'list') {
+      var arr = getPath(CFG, tab.path) || [];
+      html += '<div class="card"><div class="card-h"><h3>' + esc(tab.name) + '</h3>' +
+        '<span class="spacer"></span>' +
+        '<button class="btn small" data-act="addItem">+ 新增</button></div>' +
+        (tab.desc ? '<div class="card-desc">' + esc(tab.desc) + '</div>' : '');
+      if (!arr.length) html += '<div class="empty">还没有配置</div>';
+      arr.forEach(function (it, i) {
+        var title = (tab.titleField && it[tab.titleField]) || ('#' + (i + 1));
+        html += '<div class="item"><div class="item-h">' +
+          '<span class="idx">' + (i + 1) + '</span>' +
+          '<span class="nm">' + esc(title) + '</span>' +
+          '<span class="spacer"></span>' +
+          '<button class="btn small danger" data-act="delItem" data-i="' + i + '">删除</button></div>' +
+          '<div class="grid">';
+        (tab.fields || []).forEach(function (f) {
+          html += fieldHtml(tab.path + '.' + i + '.' + f.name, f);
+        });
+        html += '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div>';
+    $('main').innerHTML = html;
+  }
+
+  // ==================== 交互 ====================
+
+  function applyEdit(t) {
+    var p = t.getAttribute('data-p');
+    if (!p) return;
+    var v;
+    if (t.type === 'checkbox') v = t.checked;
+    else if (t.getAttribute('data-type') === 'number' || t.type === 'number') {
+      v = t.value === '' ? '' : Number(t.value);
+      if (isNaN(v)) v = t.value;
+    } else v = t.value;
+    setPath(CFG, p, v);
+    markDirty();
+  }
+
+  document.addEventListener('input', function (e) { applyEdit(e.target); });
+  document.addEventListener('change', function (e) {
+    applyEdit(e.target);
+    if (e.target.type === 'checkbox') {
+      var span = e.target.parentNode.querySelector('span');
+      if (span) span.textContent = e.target.checked ? '开' : '关';
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    var tabEl = e.target.closest('.tab');
+    if (tabEl) {
+      TAB = tabEl.getAttribute('data-t');
+      renderTabs();
+      renderMain();
+      return;
+    }
+
+    var b = e.target.closest('button[data-act]');
+    if (!b) return;
+    var act = b.getAttribute('data-act');
+    var tab = null;
+    (SCHEMA.tabs || []).forEach(function (t) { if (t.key === TAB) tab = t; });
+    if (!tab) return;
+
+    if (act === 'addItem') {
+      var arr = getPath(CFG, tab.path);
+      if (!Array.isArray(arr)) { setPath(CFG, tab.path, arr = []); }
+      var clone = JSON.parse(JSON.stringify(tab.defaultItem || {}));
+      // id 唯一化，避免和已有项撞
+      if (clone.id !== undefined) clone.id = 'item_' + Date.now();
+      arr.push(clone);
+      markDirty(); renderMain();
+    }
+    else if (act === 'delItem') {
+      var idx = parseInt(b.getAttribute('data-i'), 10);
+      var a2 = getPath(CFG, tab.path) || [];
+      if (!confirm('删除第 ' + (idx + 1) + ' 项？')) return;
+      a2.splice(idx, 1);
+      markDirty(); renderMain();
+    }
+    else if (act === 'addKV') {
+      var obj = getPath(CFG, tab.path);
+      if (typeof obj !== 'object' || obj === null) setPath(CFG, tab.path, obj = {});
+      var n = 1;
+      while (obj[String(n)]) n++;
+      obj[String(n)] = JSON.parse(JSON.stringify(tab.defaultItem || {}));
+      obj[String(n)].number = String(n);
+      markDirty(); renderMain();
+    }
+    else if (act === 'delKV') {
+      var k = b.getAttribute('data-k');
+      if (!confirm('删除「' + k + '」？')) return;
+      var o2 = getPath(CFG, tab.path) || {};
+      delete o2[k];
+      markDirty(); renderMain();
+    }
+  });
+
+  // ==================== 保存 ====================
+
+  // 把 kvlist 的键按 number 字段重建（改机床号后键要跟着变）
+  function rebuildKV() {
+    (SCHEMA.tabs || []).forEach(function (tab) {
+      if (tab.kind !== 'kvlist') return;
+      var obj = getPath(CFG, tab.path);
+      if (!obj) return;
+      var out = {};
+      Object.keys(obj).forEach(function (oldKey) {
+        var item = obj[oldKey];
+        var nk = String(item.number || oldKey).trim() || oldKey;
+        out[nk] = item;
+      });
+      setPath(CFG, tab.path, out);
+    });
+  }
+
+  // 删掉「原本没有、现在还是空串」的键，避免把 schema 里多列的字段写进配置
+  function pruneEmpty(cur, orig) {
+    if (Array.isArray(cur)) {
+      cur.forEach(function (x, i) { pruneEmpty(x, orig ? orig[i] : undefined); });
+      return;
+    }
+    if (cur && typeof cur === 'object') {
+      Object.keys(cur).forEach(function (k) {
+        var v = cur[k];
+        var o = orig ? orig[k] : undefined;
+        if (v === '' && o === undefined) { delete cur[k]; return; }
+        pruneEmpty(v, o);
+      });
+    }
+  }
+
+  function buildJson() {
+    rebuildKV();
+    var out = JSON.parse(JSON.stringify(CFG));
+    pruneEmpty(out, ORIG);
+    return JSON.stringify(out, null, 2);
+  }
+
+  function save() {
+    var errs = validate();
+    if (errs.length) {
+      alert('保存前请先修正这些问题：\n\n' +
+        errs.slice(0, 14).map(function (e, i) { return (i + 1) + '. ' + e; }).join('\n') +
+        (errs.length > 14 ? '\n… 还有 ' + (errs.length - 14) + ' 条' : ''));
+      return;
+    }
+
+    var json = buildJson();
+    var warn = $('syncSub').checked
+      ? '\n\n⚠ 勾选了「同步写 subs/config.json」：会把这份配置覆盖到子程序的兜底文件。\n' +
+        '如果 subs 那份是另一条产线的配置（本项目里两份就分别对应电极线和钢件线），\n' +
+        '覆盖后子程序在后端不可达时会按这份错误的配置动作。确认要覆盖吗？'
+      : '\n\n（未勾选同步，subs/config.json 保持不变）';
+    if (!confirm('即将写入 config.json' + warn + '\n\n继续保存？')) return;
+
+    $('btnSave').disabled = true;
+    fetch('/api/config/raw-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ json: json, syncSub: $('syncSub').checked })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        $('btnSave').disabled = false;
+        if (!j || !j.success) { toast((j && j.message) || '保存失败', false); return; }
+        toast(j.message || '已保存', true);
+        clearDirty();
+        loadAll();
+      })
+      .catch(function () { $('btnSave').disabled = false; toast('保存失败', false); });
+  }
+
+  // ==================== 绑定 ====================
+
+  $('btnSave').addEventListener('click', save);
+  $('btnReload').addEventListener('click', function () {
+    if (DIRTY && !confirm('有未保存的修改，确定放弃并重新加载？')) return;
+    loadAll();
+  });
+
+  $('btnJson').addEventListener('click', function () {
+    $('jsonText').value = buildJson();
+    $('jsonMask').classList.add('on');
+  });
+  function closeJson() { $('jsonMask').classList.remove('on'); }
+  $('jsonClose').addEventListener('click', closeJson);
+  $('jsonCancel').addEventListener('click', closeJson);
+  $('jsonMask').addEventListener('click', function (e) { if (e.target === this) closeJson(); });
+  $('jsonApply').addEventListener('click', function () {
+    var txt = $('jsonText').value, obj;
+    try { obj = JSON.parse(txt); }
+    catch (err) { toast('JSON 格式错误：' + err.message, false); return; }
+    if (!obj || !obj.plc) { toast('缺少 plc 节点', false); return; }
+    CFG = obj;
+    markDirty();
+    closeJson();
+    renderMain();
+    toast('已应用到表单，记得点保存', true);
+  });
+
+  window.addEventListener('beforeunload', function (e) {
+    if (DIRTY) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  loadAll();
+})();
+</script>
+</body>
+</html>

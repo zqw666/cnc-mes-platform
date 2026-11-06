@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="PLC"><HintPath>..\lib\PLC.dll</HintPath></Reference>
+    <Reference Include="mcOMRON"><HintPath>..\lib\mcOMRON.dll</HintPath></Reference>
+    <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+</Project>

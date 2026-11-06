@@ -21,18 +21,24 @@
       document.getElementById('processed-count').textContent = d.today_processed || 0;
       document.getElementById('unprocessed-count').textContent = d.today_unprocessed || 0;
 
-      // 机床状态 -> 页面状态文字
-      let text = '正常';
-      if (m.status === 1) {
-        if (m.workstate === 1) text = '运行';
-        else if (m.workstate === 2 || m.error_message) text = '停止';
-        else text = '正常';
-      } else {
-        text = '正常';
+      // 三台机床状态 -> 页面状态文字
+      for (let i = 0; i < 3; i++) {
+        const mi = machineData[i] || {};
+        let text;
+        if (mi.status === 0) text = '脱机';
+        else if (mi.status === 1) {
+          if (mi.workstate === 1) text = '运行';
+          else if (mi.workstate === 2 || mi.error_message) text = '停止';
+          else text = '正常';
+        } else {
+          text = '正常';
+        }
+        const el = document.getElementById('machine' + (i + 1) + '-status');
+        if (el) setStatus(el, text);
+        const card = document.getElementById('machine' + (i + 1) + '-card');
+        if (card) card.classList.toggle('offline', mi.status === 0);
       }
-      setStatus(document.getElementById('machine-status'), text);
-      setStatus(document.getElementById('shelf-status'), text);
-      setStatus(document.getElementById('robot-status'), text);
+      setStatus(document.getElementById('robot-status'), '正常');
 
       if (!connected) {
         connected = true;
@@ -51,21 +57,17 @@
       const prev = workflowState;
       workflowState = res.running ? (res.paused ? 'paused' : 'running') : 'idle';
 
-      // 状态变化时更新设备显示
+      // 状态变化时更新设备显示（脱机机床保持“脱机”并置灰）
       if (workflowState !== prev) {
-        if (workflowState === 'running') {
-          setStatus(document.getElementById('machine-status'), '运行');
-          setStatus(document.getElementById('robot-status'), '运行');
-          setStatus(document.getElementById('shelf-status'), '运行');
-        } else if (workflowState === 'paused') {
-          setStatus(document.getElementById('machine-status'), '暂停');
-          setStatus(document.getElementById('robot-status'), '暂停');
-          setStatus(document.getElementById('shelf-status'), '暂停');
-        } else {
-          setStatus(document.getElementById('machine-status'), '正常');
-          setStatus(document.getElementById('robot-status'), '正常');
-          setStatus(document.getElementById('shelf-status'), '自动');
+        const wfText = workflowState === 'running' ? '运行' : workflowState === 'paused' ? '暂停' : '正常';
+        for (let i = 1; i <= 3; i++) {
+          const mi = machineData[i - 1] || {};
+          const offline = mi.status === 0;
+          setStatus(document.getElementById('machine' + i + '-status'), offline ? '脱机' : wfText);
+          const card = document.getElementById('machine' + i + '-card');
+          if (card) card.classList.toggle('offline', offline);
         }
+        setStatus(document.getElementById('robot-status'), wfText);
       }
     } catch (e) {
       // 网络异常，保持上次状态
@@ -139,8 +141,8 @@
 
     // 日志内容：显示分包显示名 + 内容
     let content = log.content || '';
-    if (log.stepDisplay) {
-      content = `[${log.stepDisplay}] ${content}`;
+    if (log.display) {
+      content = `[${log.display}] ${content}`;
     } else if (log.step) {
       content = `[${log.step}] ${content}`;
     }
@@ -188,8 +190,8 @@
 
     const time = log.time ? new Date(log.time).toLocaleString('zh-CN') : '--';
     let content = log.content || '';
-    if (log.stepDisplay) {
-      content = `[${log.stepDisplay}] ${content}`;
+    if (log.display) {
+      content = `[${log.display}] ${content}`;
     } else if (log.step) {
       content = `[${log.step}] ${content}`;
     }
@@ -223,6 +225,70 @@
     const homeLogBody = document.getElementById('home-log-tbody');
     if (homeLogBody) {
       homeLogBody.innerHTML = '';
+    }
+  }
+
+  // ==================== 机床卡片单击/双击：双击脱机、脱机后单击加入线体 ====================
+  let machineClickTimers = [null, null, null];
+
+  function setupMachineCardEvents() {
+    for (let i = 1; i <= 3; i++) {
+      const card = document.getElementById('machine' + i + '-card');
+      if (!card) continue;
+      const idx = i - 1;
+      card.addEventListener('click', () => {
+        if (machineClickTimers[idx]) clearTimeout(machineClickTimers[idx]);
+        machineClickTimers[idx] = setTimeout(() => {
+          const m = machineData[idx];
+          if (m && m.status === 0) confirmAddMachine(m.id);
+        }, 300);
+      });
+      card.addEventListener('dblclick', () => {
+        if (machineClickTimers[idx]) { clearTimeout(machineClickTimers[idx]); machineClickTimers[idx] = null; }
+        const m = machineData[idx];
+        if (m) offlineMachine(m.id);
+      });
+    }
+  }
+
+  async function offlineMachine(id) {
+    try {
+      const res = await apiPost('/api/machine/offline', { id });
+      if (res.success) {
+        toast('机床已脱机', 'success');
+        refreshDashboard();
+      } else {
+        toast('脱机失败: ' + (res.message || '未知错误'), 'warning');
+      }
+    } catch (e) {
+      toast('脱机失败: ' + e.message, 'error');
+    }
+  }
+
+  function askConfirm(message) {
+    if (window.ELEMENT && ELEMENT.MessageBox && typeof ELEMENT.MessageBox.confirm === 'function') {
+      return ELEMENT.MessageBox.confirm(message, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }).then(() => true).catch(() => false);
+    }
+    return Promise.resolve(confirm(message));
+  }
+
+  async function confirmAddMachine(id) {
+    const ok = await askConfirm('是否将机床加入线体？');
+    if (!ok) return;
+    try {
+      const res = await apiPost('/api/machine/enable', { id });
+      if (res.success) {
+        toast('机床已加入线体', 'success');
+        refreshDashboard();
+      } else {
+        toast('加入线体失败: ' + (res.message || '未知错误'), 'warning');
+      }
+    } catch (e) {
+      toast('加入线体失败: ' + e.message, 'error');
     }
   }
 

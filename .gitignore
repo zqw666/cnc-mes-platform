@@ -29,3 +29,17 @@ Desktop.ini
 # Test data
 测试照片/
 新建文件夹/
+
+# 本地 Agent 状态（不入库）
+.workbuddy/
+
+# 本地改动前的备份文件
+*.bak-*
+*.docx.bak
+
+# Office 临时锁文件
+~$*
+
+# 弃用原型用的 amis 运行时（8.2 MB，本地保留即可，不入库、不进部署包）
+# 需要跑 frontend/lowcode/_proto/workflow-amis.html 时，从 unpkg 取 amis 6.4.0 的 sdk.js/sdk.css 放回 lib/amis/
+web-ui/frontend/lib/amis/

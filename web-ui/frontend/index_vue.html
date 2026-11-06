@@ -190,8 +190,9 @@
             <div v-for="shelf in shelves[t.key]" :key="shelf.id" class="shelf-item" :class="shelf.activated ? 'activated' : 'locked'" :data-status="shelfStatusOf(shelf, t.key)">
               <input type="checkbox" class="shelf-checkbox" :checked="shelf.selected" @change="shelfToggleSelect(t.key, shelf)">
               <div class="shelf-position">#{{ shelf.id }}</div>
-              <div class="shelf-info-row"><span class="shelf-info-label">监控:</span><span class="shelf-info-value shelf-rfid">{{ shelf.rfid || '-' }}</span></div>
-              <div class="shelf-info-row"><span class="shelf-info-label">工件:</span><span class="shelf-info-value shelf-partname">{{ shelf.partName || (shelf.rfid ? '未知工件' : '-') }}</span></div>
+              <div class="shelf-info-row" v-if="shelf.workstate > 0 || shelf.posstatus === 2"><span class="shelf-info-label">监控:</span><span class="shelf-info-value shelf-rfid">{{ shelf.rfid || '-' }}</span></div>
+              <div class="shelf-info-row" v-if="shelf.workstate > 0 || shelf.posstatus === 2"><span class="shelf-info-label">状态:</span><span class="shelf-info-value">{{ shelf.workstate === 1 ? '加工中' : (shelf.workstate === 2 ? '已完成' : (shelf.scanstatus === 0 ? '待扫描' : (shelf.scanstatus === 2 ? '扫描失败' : '待加工'))) }}</span></div>
+              <div class="shelf-info-row" v-else><span class="shelf-info-label">料位状态:</span><span class="shelf-info-value">{{ shelf.posstatus === 0 ? '禁用' : '无料' }}</span></div>
               <div class="shelf-status" :class="'status-text-' + shelfStatusOf(shelf, t.key)"></div>
             </div>
           </div>
@@ -335,13 +336,13 @@
                         <option value="electrode">电极料架</option>
                         <option value="tool">刀具料架</option>
                         <option value="steel">钢件料架</option>
-                        <option value="pallet">托盘料架</option>
+                        <option value="aluminum">铝板电极料架</option>
                       </select>
                     </div>
-                    <div class="config-field"><label>料架编号</label><input type="number" class="config-input" v-model.number="rack.number" min="1"></div>
-                    <div class="config-field"><label>行数</label><input type="number" class="config-input" v-model.number="rack.rows" min="1"></div>
-                    <div class="config-field"><label>列数</label><input type="number" class="config-input" v-model.number="rack.cols" min="1"></div>
-                    <div class="config-field"><label>光电信号</label><input type="text" class="config-input" v-model="rack.photoSignal" placeholder="DM区地址"></div>
+                    <div class="config-field"><label>料架编号</label><input type="number" class="config-input" v-model="rack.number" min="1"></div>
+                    <div class="config-field"><label>行数</label><input type="number" class="config-input" v-model="rack.rows" min="1"></div>
+                    <div class="config-field"><label>列数</label><input type="number" class="config-input" v-model="rack.cols" min="1"></div>
+                    <div class="config-field"><label>光电开始信号</label><input type="text" class="config-input" v-model="rack.photoStartSignal" placeholder="如：500.00"></div>
                     <div class="config-field"><label>开门请求信号</label><input type="text" class="config-input" v-model="rack.openRequest" placeholder="如：103.02"></div>
                     <div class="config-field"><label>允许开门信号</label><input type="text" class="config-input" v-model="rack.openSignal" placeholder="软件输出给PLC"></div>
                     <div class="config-field"><label>门状态信号</label><input type="text" class="config-input" v-model="rack.doorClosed" placeholder="如：103.01"></div>
@@ -419,6 +420,10 @@
                 <div class="config-field">
                   <label>任务号地址</label>
                   <input type="text" class="config-input" v-model="plcSignals.robot.taskNumber" placeholder="如：D200">
+                </div>
+                <div class="config-field">
+                  <label>启动加工任务号</label>
+                  <input type="text" class="config-input" v-model="plcSignals.machine.startTaskNo" placeholder="如：201">
                 </div>
                 <div class="config-field">
                   <label>机器人报错信号</label>

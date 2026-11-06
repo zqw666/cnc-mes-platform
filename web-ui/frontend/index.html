@@ -71,16 +71,24 @@
 
           <!-- 设备区域 -->
           <div class="devices">
-            <div class="device-card">
-              <img id="machine-img" src="罗德斯.png" alt="罗德斯机床" />
-              <div class="device-status">状态：<span id="machine-status" class="status normal">正常</span></div>
+            <div class="device-card" id="machine1-card">
+              <div class="device-title">机床1</div>
+              <img src="罗德斯.png" alt="机床1" />
+              <div class="device-status">状态：<span id="machine1-status" class="status normal">正常</span></div>
+            </div>
+            <div class="device-card" id="machine2-card">
+              <div class="device-title">机床2</div>
+              <img src="罗德斯.png" alt="机床2" />
+              <div class="device-status">状态：<span id="machine2-status" class="status normal">正常</span></div>
+            </div>
+            <div class="device-card" id="machine3-card">
+              <div class="device-title">机床3</div>
+              <img src="罗德斯.png" alt="机床3" />
+              <div class="device-status">状态：<span id="machine3-status" class="status normal">正常</span></div>
             </div>
             <div class="device-card">
-              <img id="shelf-img" src="料架.png" alt="料架" />
-              <div class="device-status">状态：<span id="shelf-status" class="status auto">自动</span></div>
-            </div>
-            <div class="device-card">
-              <img id="robot-img" src="机器人.png" alt="UR-20机器人" />
+              <div class="device-title">机器人</div>
+              <img src="机器人.png" alt="UR-20机器人" />
               <div class="device-status">状态：<span id="robot-status" class="status normal">正常</span></div>
             </div>
           </div>
@@ -150,9 +158,9 @@
       <section id="shelves" class="section">
         <div class="shelf-tabs">
           <button class="tab-btn active" data-tab="electrode">电极料架</button>
+          <button class="tab-btn" data-tab="aluminum">铝板电极料架</button>
           <button class="tab-btn" data-tab="tool">刀具料架</button>
           <button class="tab-btn" data-tab="steel">钢件料架</button>
-          <button class="tab-btn" data-tab="pallet">托盘料架</button>
         </div>
 
         <!-- 电极料架 -->
@@ -176,6 +184,29 @@
             </div>
           </div>
           <div class="shelf-grid" id="electrode-grid"></div>
+        </div>
+
+        <!-- 铝板电极料架 -->
+        <div class="tab-content" id="aluminum-tab">
+          <div class="shelf-controls">
+            <div class="control-buttons">
+              <button class="btn" id="aluminum-select-all">全选</button>
+              <button class="btn" id="aluminum-activate">激活</button>
+              <button class="btn" id="aluminum-lock">锁定</button>
+              <button class="btn" id="aluminum-disable">禁用</button>
+              <button class="btn" id="aluminum-no-material">无料</button>
+            </div>
+            <div class="status-legend">
+              <div class="legend-item"><div class="icon disabled"></div>禁用</div>
+              <div class="legend-item"><div class="icon no-material"></div>无料</div>
+              <div class="legend-item"><div class="icon" style="background-color:blue"></div>加工中</div>
+              <div class="legend-item"><div class="icon" style="background-color:yellow"></div>待加工</div>
+              <div class="legend-item"><div class="icon" style="background-color:green"></div>加工完成</div>
+              <div class="legend-item"><div class="icon" style="background-color:gray"></div>待扫描</div>
+              <div class="legend-item"><div class="icon" style="background-color:red"></div>错误</div>
+            </div>
+          </div>
+          <div class="shelf-grid" id="aluminum-grid"></div>
         </div>
 
         <!-- 刀具料架 -->
@@ -225,27 +256,6 @@
           <div class="shelf-grid" id="steel-grid"></div>
         </div>
 
-        <!-- 托盘料架 -->
-        <div class="tab-content" id="pallet-tab">
-          <div class="shelf-controls">
-            <div class="control-buttons">
-              <button class="btn" id="pallet-select-all">全选</button>
-              <button class="btn" id="pallet-activate">激活</button>
-              <button class="btn" id="pallet-lock">锁定</button>
-              <button class="btn" id="pallet-disable">禁用</button>
-              <button class="btn" id="pallet-no-material">无料</button>
-            </div>
-            <div class="status-legend">
-              <div class="legend-item"><div class="icon disabled"></div>禁用</div>
-              <div class="legend-item"><div class="icon no-material"></div>无料</div>
-              <div class="legend-item"><div class="icon" style="background-color:blue"></div>加工中</div>
-              <div class="legend-item"><div class="icon" style="background-color:yellow"></div>待加工</div>
-              <div class="legend-item"><div class="icon" style="background-color:green"></div>加工完成</div>
-              <div class="legend-item"><div class="icon" style="background-color:red"></div>错误</div>
-            </div>
-          </div>
-          <div class="shelf-grid" id="pallet-grid"></div>
-        </div>
       </section>
 
       <!-- ===== 日志查询 ===== -->
@@ -480,6 +490,14 @@
                   <input type="text" class="config-input" id="cfg-signal-preset-place-task" placeholder="如：D800">
                 </div>
                 <div class="config-field">
+                  <label>预设台扫描任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-scan-task" placeholder="如：D810">
+                </div>
+                <div class="config-field">
+                  <label>回原点任务号</label>
+                  <input type="text" class="config-input" id="cfg-signal-preset-home-task" placeholder="如：806">
+                </div>
+                <div class="config-field">
                   <label>门锁状态信号</label>
                   <input type="text" class="config-input" id="cfg-signal-preset-door-lock" placeholder="如：100.04">
                 </div>
@@ -528,6 +546,36 @@
                 <div class="config-field">
                   <label>清洁站放任务号</label>
                   <input type="text" class="config-input" id="cfg-signal-clean-place-task" placeholder="如：D1200">
+                </div>
+              </div>
+            </div>
+
+            <!-- 扫码枪配置 -->
+            <div class="config-subsection">
+              <h4 class="subsection-title">扫码枪配置</h4>
+              <div class="signal-grid">
+                <div class="config-field">
+                  <label>扫码枪类型</label>
+                  <select class="config-input" id="cfg-scanner-type">
+                    <option value="rcd">RCD扫码枪</option>
+                    <option value="rfid">RFID读写器</option>
+                  </select>
+                </div>
+                <div class="config-field">
+                  <label>RFID串口</label>
+                  <input type="text" class="config-input" id="cfg-scanner-rfid-com" placeholder="如：COM3">
+                </div>
+                <div class="config-field">
+                  <label>RCD扫码枪IP</label>
+                  <input type="text" class="config-input" id="cfg-scanner-rcd-ip" placeholder="如：192.168.101.71">
+                </div>
+                <div class="config-field">
+                  <label>RCD扫码枪端口</label>
+                  <input type="text" class="config-input" id="cfg-scanner-rcd-port" placeholder="如：5000">
+                </div>
+                <div class="config-field">
+                  <label>心跳间隔(秒)</label>
+                  <input type="number" class="config-input" id="cfg-scanner-heartbeat" placeholder="如：60">
                 </div>
               </div>
             </div>

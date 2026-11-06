@@ -10,7 +10,7 @@ namespace MachineMonitor
         {
             var machines = new List<object>();
             var db = DatabaseRepository.CreateDb();
-            var dt = db.ExeForDtl("SELECT id,machinename,machineip,workstate,status,error_message FROM macmessage");
+            var dt = db.ExeForDtl("SELECT id,machinename,machineip,workstate,status,error_message FROM macmessage ORDER BY id");
             if (dt != null && dt.Rows.Count > 0)
             {
                 foreach (DataRow dr in dt.Rows)

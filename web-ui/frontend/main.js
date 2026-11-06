@@ -7,9 +7,9 @@ var workflowState = 'idle';
 var PAGE_SIZE = 50;
 var TASK_DATA = [], currentPage = 1, filteredData = [];
 var grids = {};
-var shelves = { electrode: [], tool: [], steel: [], pallet: [] };
-var RACKTYPE_MAP = { electrode: 1, tool: 3, steel: 2, pallet: 4 };
-var DEFAULT_SLOTS = { electrode: 80, tool: 20, steel: 12, pallet: 16 };
+var shelves = { electrode: [], tool: [], steel: [], aluminum: [] };
+var RACKTYPE_MAP = { electrode: 1, tool: 3, steel: 2, aluminum: 5 };
+var DEFAULT_SLOTS = { electrode: 80, tool: 20, steel: 12, aluminum: 6 };
 
 // ==================== 更多全局共享状态 ====================
 var menuItems = [], sections = [];
@@ -100,9 +100,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnExportExcel = document.getElementById('btn-export-excel');
   grids = {
     electrode: document.getElementById('electrode-grid'),
+    aluminum: document.getElementById('aluminum-grid'),
     tool: document.getElementById('tool-grid'),
-    steel: document.getElementById('steel-grid'),
-    pallet: document.getElementById('pallet-grid')
+    steel: document.getElementById('steel-grid')
   };
   // ==================== 工作流状态 ====================
 
@@ -110,8 +110,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ==================== 控制按钮（工作流 API） ====================
 
-  // 开始运行 -> 启动工作流
-  document.getElementById('btn-start')?.addEventListener('click', () => doWorkflowAction('start'));
+  // 开始运行 -> 启动工作流（同时取消所有料架激活状态）
+  document.getElementById('btn-start')?.addEventListener('click', () => {
+    ['electrode', 'aluminum', 'tool', 'steel'].forEach(t => shelfLock(t));
+    doWorkflowAction('start');
+  });
   // 暂停运行 -> 暂停工作流
   document.getElementById('btn-pause')?.addEventListener('click', () => {
     if (workflowState === 'paused') {
@@ -126,9 +129,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 复位 -> 停止工作流 + 重置界面
   document.getElementById('btn-reset')?.addEventListener('click', async () => {
     await doWorkflowAction('stop');
-    setStatus(document.getElementById('machine-status'), '正常');
+    for (let i = 1; i <= 3; i++) {
+      setStatus(document.getElementById('machine' + i + '-status'), '正常');
+      const card = document.getElementById('machine' + i + '-card');
+      if (card) card.classList.remove('offline');
+    }
     setStatus(document.getElementById('robot-status'), '正常');
-    setStatus(document.getElementById('shelf-status'), '自动');
     document.getElementById('part-name').textContent = '—';
     document.getElementById('process-duration').textContent = '00:00:00';
     document.getElementById('processed-count').textContent = '0';
@@ -138,6 +144,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 定时同步工作流状态
   syncWorkflowStatus();
   setInterval(syncWorkflowStatus, REFRESH_INTERVAL);
+
+  // 机床卡片单击/双击事件
+  setupMachineCardEvents();
 
   // 启动数据轮询
   refreshDashboard();
@@ -175,7 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderTable(1);
 
   // ==================== 料架管理 ====================
-  // racktype: 1=electrode(80槽) 2=steel(12槽) 3=tool 4=pallet
+  // racktype: 1=electrode(80槽) 2=steel(12槽) 3=tool 5=aluminum(铝板电极)
 
   // 从后端加载料架数据
 
@@ -197,7 +206,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  ['electrode', 'tool', 'steel', 'pallet'].forEach(type => {
+  ['electrode', 'aluminum', 'tool', 'steel'].forEach(type => {
     const el = id => document.getElementById(type + '-' + id);
     if (el('select-all')) el('select-all').addEventListener('click', () => shelfSelectAll(type));
     if (el('activate')) el('activate').addEventListener('click', () => shelfActivate(type));
@@ -209,9 +218,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try { await loadShelves(); } catch (e) { console.warn('料架加载失败', e); }
   renderShelves('electrode');
+  renderShelves('aluminum');
   renderShelves('tool');
   renderShelves('steel');
-  renderShelves('pallet');
+
+  // ==================== 料架数据轮询 ====================
+  // 子程序更新料位后调用 /api/rack/notify，主控程序递增版本号，前端据此刷新料架图标
+  let lastRackVersion = 0;
+  async function pollRackUpdate() {
+    try {
+      const res = await apiGet('/api/rack/status');
+      if (res && res.success && typeof res.version === 'number' && res.version !== lastRackVersion) {
+        lastRackVersion = res.version;
+        await loadShelves();
+        renderShelves('electrode');
+        renderShelves('aluminum');
+        renderShelves('tool');
+        renderShelves('steel');
+      }
+    } catch (e) { /* silent */ }
+  }
+  setInterval(pollRackUpdate, 2000);
 
   // ==================== 日志查询 ====================
 
@@ -331,10 +358,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 映射到表单
       const mapping = {
-        '线体配置|料架类型': 'cfg-rack-type',
-        '线体配置|料架个数': 'cfg-rack-count',
-        '线体配置|料架层数': 'cfg-rack-layers',
-        '线体配置|料架每层料位数': 'cfg-rack-slots',
         '线体配置|夹爪类型': 'cfg-gripper-type',
         '线体配置|抓取方式': 'cfg-grab-mode',
         '线体配置|随行台有无': 'cfg-pallet-enabled',
@@ -417,11 +440,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const XLSX = window.XLSX || (await loadXlsxLib());
       const rows = [
         ['配置项名称', '配置项细分', '具体数值'],
-        ['线体配置', '料架类型', document.getElementById('cfg-rack-type').value],
-        ['', '料架个数', document.getElementById('cfg-rack-count').value],
-        ['', '料架层数', document.getElementById('cfg-rack-layers').value],
-        ['', '料架每层料位数', document.getElementById('cfg-rack-slots').value],
-        ['', '夹爪类型', document.getElementById('cfg-gripper-type').value],
+        ['线体配置', '夹爪类型', document.getElementById('cfg-gripper-type').value],
         ['', '抓取方式', document.getElementById('cfg-grab-mode').value],
         ['', '随行台有无', document.getElementById('cfg-shuttle-exists').value],
         ['', '随行台料位数', document.getElementById('cfg-shuttle-slots').value],

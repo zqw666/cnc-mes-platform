@@ -26,9 +26,13 @@ namespace MachineMonitor
             else if (action == "pause")
                 db.ExecuteSql("UPDATE macmessage SET workstate=0 WHERE id=" + id);
             else if (action == "stop")
-                db.ExecuteSql("UPDATE macmessage SET workstate=0,workpiecename=NULL,workpieceworkstate=NULL,processing_duration=0 WHERE id=" + id);
+                db.ExecuteSql("UPDATE macmessage SET workstate=0 WHERE id=" + id);
+            else if (action == "offline")
+                db.ExecuteSql("UPDATE macmessage SET status=0 WHERE id=" + id);
+            else if (action == "enable")
+                db.ExecuteSql("UPDATE macmessage SET status=1 WHERE id=" + id);
 
-            string msg = action == "start" ? "已发送启动命令" : action == "pause" ? "已发送暂停命令" : "已发送停止命令";
+            string msg = action == "start" ? "已发送启动命令" : action == "pause" ? "已发送暂停命令" : action == "stop" ? "已发送停止命令" : action == "offline" ? "机床已脱机" : "机床已加入线体";
             return AppState.Json(new { success = true, message = msg, action });
         }
 

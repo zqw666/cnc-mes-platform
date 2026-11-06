@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工序编排 - MachineMonitor</title>
+<style>
+  :root{
+    --bg:#F5F6F8; --card:#FFFFFF; --line:#E3E6EB; --line-2:#CDD2DA;
+    --text:#1F2329; --text-2:#646A73; --text-3:#8F959E;
+    --blue:#185FA5; --blue-bg:#E6F1FB;
+    --green:#0F6E56; --green-bg:#E1F5EE;
+    --red:#A32D2D; --red-bg:#FCEBEB;
+    --amber:#854F0B; --amber-bg:#FAEEDA;
+    --gray-bg:#F1EFE8;
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.6;
+  }
+  header{
+    background:var(--card); border-bottom:1px solid var(--line);
+    padding:14px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    position:sticky; top:0; z-index:10;
+  }
+  h1{font-size:16px; font-weight:500; margin:0;}
+  .sub{font-size:12px; color:var(--text-3);}
+  .spacer{flex:1;}
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  button{
+    font:inherit; font-size:13px; padding:6px 14px; border-radius:6px;
+    border:1px solid var(--line-2); background:var(--card); color:var(--text);
+    cursor:pointer; transition:background .15s,border-color .15s;
+  }
+  button:hover:not(:disabled){background:#F2F3F5; border-color:#B8BEC7;}
+  button:disabled{opacity:.45; cursor:not-allowed;}
+  button.primary{background:var(--blue); border-color:var(--blue); color:#fff;}
+  button.primary:hover:not(:disabled){background:#14508C; border-color:#14508C;}
+  button.danger{color:var(--red); border-color:#E5B4B4;}
+  button.danger:hover:not(:disabled){background:var(--red-bg);}
+
+  main{padding:16px 24px 60px; max-width:1320px; margin:0 auto;}
+
+  .panel{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    margin-bottom:14px;
+  }
+  .panel-head{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:12px 16px; border-bottom:1px solid var(--line);
+  }
+  .panel-title{font-size:13px; font-weight:500; color:var(--text-2);}
+  .field{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-2);}
+  .field input[type=number]{width:88px;}
+  input[type=number],select{
+    font:inherit; font-size:13px; padding:5px 8px; border:1px solid var(--line-2);
+    border-radius:6px; background:var(--card); color:var(--text);
+  }
+  input[type=number]:focus,select:focus{outline:none; border-color:var(--blue);}
+  .seg{display:inline-flex; border:1px solid var(--line-2); border-radius:6px; overflow:hidden;}
+  .seg label{
+    padding:5px 12px; font-size:13px; cursor:pointer; color:var(--text-2);
+    background:var(--card); user-select:none;
+  }
+  .seg label:first-child{border-right:1px solid var(--line-2);}
+  .seg input{display:none;}
+  .seg input:checked + span{color:var(--blue); font-weight:500;}
+  .seg label:has(input:checked){background:var(--blue-bg);}
+
+  .statusbar{
+    display:flex; align-items:center; gap:10px; padding:10px 16px;
+    font-size:13px; color:var(--text-2); border-bottom:1px solid var(--line);
+  }
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--text-3); display:inline-block;}
+  .dot.on{background:var(--green); box-shadow:0 0 0 3px var(--green-bg);}
+  .dot.pause{background:var(--amber); box-shadow:0 0 0 3px var(--amber-bg);}
+
+  .grid-head,li.row{
+    display:grid;
+    grid-template-columns:34px 42px minmax(180px,1fr) 64px 92px 132px 92px 96px 82px;
+    align-items:center; gap:8px;
+  }
+  .grid-head{
+    padding:8px 16px; font-size:12px; color:var(--text-3);
+    border-bottom:1px solid var(--line); background:#FAFBFC;
+  }
+  ul{list-style:none; margin:0; padding:0;}
+  li.row{
+    padding:8px 16px; border-bottom:1px solid var(--line);
+    background:var(--card); transition:background .12s;
+  }
+  li.row:last-child{border-bottom:none;}
+  li.row:hover{background:#FAFBFC;}
+  li.row.dragging{opacity:.4; background:var(--blue-bg);}
+  li.row.disabled .name-text{color:var(--text-3); text-decoration:line-through;}
+
+  .handle{cursor:grab; color:var(--text-3); font-size:15px; text-align:center; user-select:none;}
+  .handle:active{cursor:grabbing;}
+  .idx{font-size:12px; color:var(--text-3); font-variant-numeric:tabular-nums;}
+  .name-text{font-size:13px;}
+  .code{font-size:11px; color:var(--text-3); margin-left:8px; font-family:ui-monospace,Consolas,monospace;}
+
+  .badge{
+    font-size:12px; padding:2px 8px; border-radius:10px; text-align:center;
+    background:var(--gray-bg); color:var(--text-2); white-space:nowrap;
+  }
+  .badge.running{background:var(--blue-bg); color:var(--blue);}
+  .badge.completed{background:var(--green-bg); color:var(--green);}
+  .badge.failed{background:var(--red-bg); color:var(--red);}
+  .badge.skipped{background:var(--amber-bg); color:var(--amber);}
+
+  .sw{position:relative; display:inline-block; width:36px; height:20px; cursor:pointer;}
+  .sw input{display:none;}
+  .sw i{
+    position:absolute; inset:0; background:#C9CED6; border-radius:10px; transition:background .15s;
+  }
+  .sw i::after{
+    content:""; position:absolute; width:16px; height:16px; left:2px; top:2px;
+    background:#fff; border-radius:50%; transition:transform .15s;
+  }
+  .sw input:checked + i{background:var(--blue);}
+  .sw input:checked + i::after{transform:translateX(16px);}
+
+  .chk{display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-2); cursor:pointer; user-select:none;}
+  .chk input{accent-color:var(--blue);}
+
+  .toast{
+    position:fixed; left:50%; bottom:28px; transform:translateX(-50%);
+    background:#2C2C2A; color:#fff; font-size:13px; padding:9px 18px;
+    border-radius:6px; opacity:0; pointer-events:none; transition:opacity .2s;
+    z-index:100; max-width:80vw;
+  }
+  .toast.show{opacity:1;}
+  .toast.err{background:var(--red);}
+  .empty{padding:40px; text-align:center; color:var(--text-3); font-size:13px;}
+  .tip{font-size:12px; color:var(--text-3); padding:10px 16px; border-top:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>工序编排</h1>
+  <span class="sub">拖动左侧手柄调整顺序 · 顺序即执行顺序</span>
+  <span class="spacer"></span>
+  <div class="toolbar">
+    <button id="btnReload">重新加载</button>
+    <button id="btnSave">保存编排</button>
+    <button id="btnStart" class="primary">启动</button>
+    <button id="btnPause">暂停</button>
+    <button id="btnResume">恢复</button>
+    <button id="btnStop" class="danger">停止</button>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">执行参数</span>
+      <div class="field">
+        <span>模式</span>
+        <div class="seg">
+          <label><input type="radio" name="mode" value="once" checked><span>单次执行</span></label>
+          <label><input type="radio" name="mode" value="loop"><span>轮播</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <span>轮播间隔</span>
+        <input type="number" id="inpInterval" value="1000" min="100" step="100">
+        <span>ms</span>
+      </div>
+      <div class="field">
+        <label class="chk"><input type="checkbox" id="chkSimulate" checked>仿真模式（不启动真实子程序）</label>
+      </div>
+      <span class="spacer"></span>
+      <span class="sub" id="modeHint"></span>
+    </div>
+
+    <div class="statusbar">
+      <span class="dot" id="runDot"></span>
+      <span id="runText">未运行</span>
+      <span class="spacer"></span>
+      <span id="stepSummary"></span>
+    </div>
+
+    <div class="grid-head">
+      <span></span>
+      <span>序号</span>
+      <span>步骤</span>
+      <span>启用</span>
+      <span>超时(s)</span>
+      <span>失败策略</span>
+      <span>仿真(ms)</span>
+      <span>模拟失败</span>
+      <span>状态</span>
+    </div>
+    <ul id="list"></ul>
+    <div class="tip">
+      保存会把当前顺序写入 exe 目录下的 flow.json。运行中不允许修改，先停止再改。
+      轮播模式下任一步失败会自动停机（避免一直跳过、看起来正常）。
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  var API = '';
+  var state = { running: false, paused: false, steps: [] };
+  var pollTimer = null;
+  var dirty = false;
+
+  var el = {
+    list: document.getElementById('list'),
+    dot: document.getElementById('runDot'),
+    runText: document.getElementById('runText'),
+    summary: document.getElementById('stepSummary'),
+    hint: document.getElementById('modeHint'),
+    toast: document.getElementById('toast'),
+    chkSim: document.getElementById('chkSimulate'),
+    interval: document.getElementById('inpInterval')
+  };
+
+  var STATUS_TEXT = {
+    idle: '待机', running: '执行中', completed: '完成', failed: '失败', skipped: '跳过'
+  };
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function toast(msg, isErr) {
+    el.toast.textContent = msg;
+    el.toast.className = 'toast show' + (isErr ? ' err' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.toast.className = 'toast'; }, 2600);
+  }
+
+  function api(path, body) {
+    var opt = body === undefined ? {} : {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    };
+    return fetch(API + path, opt).then(function (r) { return r.json(); });
+  }
+
+  function getMode() {
+    var r = document.querySelector('input[name=mode]:checked');
+    return r ? r.value : 'once';
+  }
+
+  function render() {
+    if (!state.steps.length) {
+      el.list.innerHTML = '<div class="empty">暂无步骤，请检查 subs 目录或 flow.json</div>';
+      return;
+    }
+
+    el.list.innerHTML = state.steps.map(function (s, i) {
+      return '<li class="row' + (s.enabled ? '' : ' disabled') + '" data-name="' + esc(s.name) + '" draggable="true">' +
+        '<span class="handle" title="拖动排序">⋮⋮</span>' +
+        '<span class="idx">' + (i + 1) + '</span>' +
+        '<span class="name"><span class="name-text">' + esc(s.display) + '</span>' +
+          '<span class="code">' + esc(s.name) + '</span></span>' +
+        '<label class="sw"><input type="checkbox" class="f-enabled"' + (s.enabled ? ' checked' : '') + '><i></i></label>' +
+        '<input class="f-timeout" type="number" min="1" max="7200" value="' + (s.timeoutSec || 300) + '">' +
+        '<select class="f-onfail">' +
+          '<option value="stop"' + (s.onFail === 'stop' ? ' selected' : '') + '>停在失败步</option>' +
+          '<option value="skip"' + (s.onFail === 'skip' ? ' selected' : '') + '>跳过继续</option>' +
+        '</select>' +
+        '<input class="f-simms" type="number" min="100" step="100" value="' + (s.simMs || 3000) + '">' +
+        '<label class="chk"><input type="checkbox" class="f-simfail"' + (s.simFail ? ' checked' : '') + '>失败</label>' +
+        '<span class="badge ' + (s.status || 'idle') + '" data-status="' + esc(s.name) + '">' +
+          (STATUS_TEXT[s.status] || '待机') + '</span>' +
+      '</li>';
+    }).join('');
+
+    updateSummary();
+    bindRows();
+  }
+
+  function updateSummary() {
+    var total = state.steps.length;
+    var on = state.steps.filter(function (s) { return s.enabled; }).length;
+    el.summary.textContent = '共 ' + total + ' 步 · 启用 ' + on + ' 步';
+  }
+
+  function bindRows() {
+    Array.prototype.forEach.call(el.list.querySelectorAll('.f-enabled'), function (cb) {
+      cb.addEventListener('change', function () {
+        var li = cb.closest('li.row');
+        li.classList.toggle('disabled', !cb.checked);
+        var name = li.getAttribute('data-name');
+        state.steps.forEach(function (s) { if (s.name === name) s.enabled = cb.checked; });
+        updateSummary();
+        dirty = true;
+      });
+    });
+
+    Array.prototype.forEach.call(el.list.querySelectorAll('input,select'), function (ctrl) {
+      if (ctrl.classList.contains('f-enabled')) return;
+      ctrl.addEventListener('change', function () { dirty = true; });
+    });
+  }
+
+  // ============ 拖拽排序 ============
+  var dragEl = null;
+
+  el.list.addEventListener('dragstart', function (e) {
+    var li = e.target.closest('li.row');
+    if (!li) return;
+    if (e.target.closest('input,select,label')) { e.preventDefault(); return; }
+    dragEl = li;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', li.getAttribute('data-name'));
+    li.classList.add('dragging');
+  });
+
+  el.list.addEventListener('dragover', function (e) {
+    if (!dragEl) return;
+    e.preventDefault();
+    var after = afterElement(e.clientY);
+    if (after == null) el.list.appendChild(dragEl);
+    else el.list.insertBefore(dragEl, after);
+  });
+
+  el.list.addEventListener('dragend', function () {
+    if (!dragEl) return;
+    dragEl.classList.remove('dragging');
+    dragEl = null;
+    renumber();
+    syncOrderFromDom();
+    dirty = true;
+  });
+
+  function afterElement(y) {
+    var rows = Array.prototype.slice.call(el.list.querySelectorAll('li.row:not(.dragging)'));
+    var closest = null, closestOffset = Number.NEGATIVE_INFINITY;
+    rows.forEach(function (row) {
+      var box = row.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closestOffset) { closestOffset = offset; closest = row; }
+    });
+    return closest;
+  }
+
+  function renumber() {
+    Array.prototype.forEach.call(el.list.querySelectorAll('li.row'), function (li, i) {
+      li.querySelector('.idx').textContent = i + 1;
+    });
+  }
+
+  function syncOrderFromDom() {
+    var order = {};
+    state.steps.forEach(function (s) { order[s.name] = s; });
+    var next = [];
+    Array.prototype.forEach.call(el.list.querySelectorAll('li.row'), function (li) {
+      var s = order[li.getAttribute('data-name')];
+      if (s) next.push(s);
+    });
+    state.steps = next;
+  }
+
+  // ============ 采集与保存 ============
+  function collect() {
+    syncOrderFromDom();
+    var steps = Array.prototype.map.call(el.list.querySelectorAll('li.row'), function (li) {
+      var name = li.getAttribute('data-name');
+      var old = null;
+      state.steps.forEach(function (s) { if (s.name === name) old = s; });
+      return {
+        name: name,
+        display: old ? old.display : name,
+        enabled: li.querySelector('.f-enabled').checked,
+        timeoutSec: parseInt(li.querySelector('.f-timeout').value, 10) || 300,
+        onFail: li.querySelector('.f-onfail').value,
+        simMs: parseInt(li.querySelector('.f-simms').value, 10) || 3000,
+        simFail: li.querySelector('.f-simfail').checked
+      };
+    });
+
+    return {
+      version: 1,
+      mode: getMode(),
+      loopIntervalMs: parseInt(el.interval.value, 10) || 1000,
+      simulate: el.chkSim.checked,
+      steps: steps
+    };
+  }
+
+  function save(silent) {
+    return api('/api/workflow/save', collect()).then(function (r) {
+      if (!r.success) throw new Error(r.message || '保存失败');
+      dirty = false;
+      if (!silent) toast(r.message || '已保存');
+      return r;
+    });
+  }
+
+  function load() {
+    return api('/api/workflow/steps').then(function (r) {
+      if (!r.success) throw new Error(r.message || '加载失败');
+      state.running = !!r.running;
+      state.paused = !!r.paused;
+      state.steps = (r.steps || []).map(function (s) {
+        return {
+          name: s.name, display: s.display, enabled: !!s.enabled,
+          timeoutSec: s.timeoutSec, onFail: s.onFail,
+          simMs: s.simMs, simFail: !!s.simFail,
+          status: s.status || 'idle'
+        };
+      });
+
+      el.chkSim.checked = !!r.simulate;
+      el.interval.value = r.loopIntervalMs || 1000;
+      var radio = document.querySelector('input[name=mode][value="' + (r.mode || 'once') + '"]');
+      if (radio) radio.checked = true;
+
+      render();
+      renderRunState();
+    });
+  }
+
+  function renderRunState() {
+    el.dot.className = 'dot' + (state.running ? (state.paused ? ' pause' : ' on') : '');
+    el.runText.textContent = !state.running ? '未运行' : (state.paused ? '已暂停' : '运行中');
+    document.getElementById('btnStart').disabled = state.running;
+    document.getElementById('btnStop').disabled = !state.running;
+    document.getElementById('btnPause').disabled = !state.running || state.paused;
+    document.getElementById('btnResume').disabled = !state.running || !state.paused;
+  }
+
+  function applyStatus(steps) {
+    (steps || []).forEach(function (s) {
+      var b = el.list.querySelector('[data-status="' + s.name + '"]');
+      if (!b) return;
+      var st = s.status || 'idle';
+      b.className = 'badge ' + st;
+      b.textContent = STATUS_TEXT[st] || '待机';
+    });
+  }
+
+  function poll() {
+    api('/api/workflow/status').then(function (r) {
+      if (!r.success) return;
+      var wasRunning = state.running;
+      state.running = !!r.running;
+      state.paused = !!r.paused;
+      applyStatus(r.steps);
+      if (wasRunning !== state.running) {
+        if (!state.running) toast('工作流已结束');
+        renderRunState();
+        if (!state.running) load();
+      } else {
+        renderRunState();
+      }
+    }).catch(function () {});
+  }
+
+  // ============ 事件绑定 ============
+  document.getElementById('btnReload').onclick = function () {
+    if (dirty && !confirm('有未保存的修改，确定重新加载？')) return;
+    load().then(function () { toast('已重新加载'); }).catch(function (e) { toast(e.message, true); });
+  };
+
+  document.getElementById('btnSave').onclick = function () {
+    save(false).catch(function (e) { toast(e.message, true); });
+  };
+
+  document.getElementById('btnStart').onclick = function () {
+    var payload = collect();
+    // 先落盘再启动，保证界面选定的模式/仿真开关生效
+    save(true).then(function () {
+      return api('/api/workflow/start', payload);
+    }).then(function (r) {
+      if (!r.success) throw new Error(r.message || '启动失败');
+      toast(r.message || '已启动');
+      state.running = true;
+      state.paused = false;
+      renderRunState();
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  document.getElementById('btnStop').onclick = function () {
+    api('/api/workflow/stop', {}).then(function (r) {
+      toast(r.message || '已停止', !r.success);
+      if (r.success) { state.running = false; state.paused = false; renderRunState(); }
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  document.getElementById('btnPause').onclick = function () {
+    api('/api/workflow/pause', {}).then(function (r) {
+      toast(r.message || '已暂停', !r.success);
+      if (r.success) { state.paused = true; renderRunState(); }
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  document.getElementById('btnResume').onclick = function () {
+    api('/api/workflow/resume', {}).then(function (r) {
+      toast(r.message || '已恢复', !r.success);
+      if (r.success) { state.paused = false; renderRunState(); }
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  document.querySelectorAll('input[name=mode]').forEach(function (r) {
+    r.addEventListener('change', function () { dirty = true; updateHint(); });
+  });
+  el.chkSim.addEventListener('change', function () { dirty = true; updateHint(); });
+  el.interval.addEventListener('change', function () { dirty = true; });
+
+  function updateHint() {
+    var loop = getMode() === 'loop';
+    el.hint.textContent = loop
+      ? '轮播模式：每轮结束等待间隔后继续，任一步失败即停'
+      : '单次模式：按顺序跑一遍即结束';
+  }
+
+  window.addEventListener('beforeunload', function (e) {
+    if (dirty) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // ============ 启动 ============
+  updateHint();
+  load().then(function () {
+    pollTimer = setInterval(poll, 1500);
+  }).catch(function (e) {
+    toast('加载失败：' + e.message, true);
+    el.list.innerHTML = '<div class="empty">加载失败，请确认主控程序已启动</div>';
+  });
+})();
+</script>
+</body>
+</html>

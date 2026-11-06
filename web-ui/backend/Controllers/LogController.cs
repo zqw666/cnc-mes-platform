@@ -17,6 +17,7 @@ namespace MachineMonitor
                 var logs = AppState.AllLogs.Reverse().Skip((page - 1) * pageSize).Take(pageSize)
                     .Select(e => new
                     {
+                        id = e.Id,
                         step = e.Step,
                         display = e.Display,
                         level = e.Level,

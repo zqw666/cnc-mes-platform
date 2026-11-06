@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工序编排设计器 - MachineMonitor</title>
+<style>
+  /* ===== Ant Design 5 token（对齐 JNPF） ===== */
+  :root{
+    --primary:#1677ff;
+    --primary-bg:#e6f4ff;
+    --primary-border:#91caff;
+    --bg:#f5f5f5;
+    --bg-canvas:#fafafa;
+    --container:#fff;
+    --border:#f0f0f0;
+    --border-2:#d9d9d9;
+    --text:rgba(0,0,0,.88);
+    --text-2:rgba(0,0,0,.65);
+    --text-3:rgba(0,0,0,.45);
+    --text-4:rgba(0,0,0,.25);
+    --success:#52c41a; --success-bg:#f6ffed; --success-border:#b7eb8f;
+    --error:#ff4d4f;   --error-bg:#fff2f0;   --error-border:#ffccc7;
+    --warning:#faad14; --warning-bg:#fffbe6; --warning-border:#ffe58f;
+    --radius:8px;
+    --radius-sm:6px;
+    --shadow:0 1px 2px 0 rgba(0,0,0,.03), 0 1px 6px -1px rgba(0,0,0,.02), 0 2px 4px 0 rgba(0,0,0,.02);
+    --shadow-lg:0 6px 16px 0 rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12);
+    --rail:48px; --pool:264px; --props:300px; --header:48px;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; height:100%; overflow:hidden; background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;
+    font-size:14px; color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;}
+
+  /* ===== 顶栏 ===== */
+  .topbar{
+    height:var(--header); background:var(--container);
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:12px; padding:0 16px;
+    position:relative; z-index:20;
+  }
+  .topbar .back{
+    width:28px; height:28px; border:none; background:transparent; border-radius:var(--radius-sm);
+    display:grid; place-items:center; cursor:pointer; color:var(--text-2);
+  }
+  .topbar .back:hover{background:#f5f5f5;}
+  .topbar .title{font-size:15px; font-weight:600; color:var(--text);}
+  .topbar .divider{width:1px; height:16px; margin:0; background:var(--border-2); flex:0 0 1px;}
+  .topbar .crumb{font-size:13px; color:var(--text-3);}
+  .topbar .spacer{flex:1;}
+
+  .run-state{
+    display:flex; align-items:center; gap:6px;
+    font-size:13px; color:var(--text-2);
+    padding:4px 10px; border-radius:14px; background:#fafafa; border:1px solid var(--border);
+  }
+  .run-state .dot{width:6px; height:6px; border-radius:50%; background:var(--text-4);}
+  .run-state.on{background:var(--success-bg); border-color:var(--success-border); color:#389e0d;}
+  .run-state.on .dot{background:var(--success); box-shadow:0 0 0 3px rgba(82,196,26,.15);}
+  .run-state.warn{background:var(--warning-bg); border-color:var(--warning-border); color:#d48806;}
+  .run-state.warn .dot{background:var(--warning);}
+
+  .btn{
+    height:32px; padding:0 15px; border-radius:var(--radius-sm);
+    border:1px solid var(--border-2); background:var(--container); color:var(--text);
+    font-size:14px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+    transition:all .2s;
+  }
+  .btn:hover{border-color:var(--primary); color:var(--primary);}
+  .btn-primary{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .btn-primary:hover{background:#4096ff; border-color:#4096ff; color:#fff;}
+  .btn-danger{background:var(--container); border-color:var(--error); color:var(--error);}
+  .btn-danger:hover{background:var(--error-bg); color:var(--error); border-color:var(--error);}
+  .btn[disabled]{opacity:.5; cursor:not-allowed;}
+  a.btn{text-decoration:none;}
+
+  /* ===== 流程模板 ===== */
+  .flow-pick{display:flex; align-items:center; gap:6px;}
+  .flow-pick>label{font-size:13px; color:var(--text-3); white-space:nowrap;}
+  .flow-pick select{
+    height:32px; min-width:132px; max-width:210px; padding:0 8px;
+    border:1px solid var(--border-2); border-radius:var(--radius-sm);
+    background:var(--container); color:var(--text); font-size:13px;
+    font-family:inherit; cursor:pointer;
+  }
+  .flow-pick select:hover{border-color:var(--primary);}
+  .flow-pick select:focus{outline:none; border-color:var(--primary); box-shadow:0 0 0 2px rgba(22,119,255,.1);}
+  .flow-pick select[disabled]{opacity:.55; cursor:not-allowed;}
+
+  /* ===== 弹窗 ===== */
+  .mask{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; place-items:center; z-index:60;}
+  .mask.on{display:grid;}
+  .dlg{
+    width:600px; max-width:92vw; max-height:84vh; background:var(--container);
+    border-radius:var(--radius); box-shadow:var(--shadow-lg);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .dlg-h{display:flex; align-items:center; gap:8px; padding:14px 18px; border-bottom:1px solid var(--border);}
+  .dlg-h h3{margin:0; font-size:15px; font-weight:600; flex:1;}
+  .dlg-h .x{border:none; background:transparent; cursor:pointer; color:var(--text-3); font-size:20px; line-height:1; padding:0 2px;}
+  .dlg-h .x:hover{color:var(--text);}
+  .dlg-b{padding:16px 18px; overflow-y:auto; display:flex; flex-direction:column; gap:14px;}
+  .dlg-f{padding:12px 18px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px;}
+
+  .tpl-list{display:flex; flex-direction:column; gap:6px;}
+  .tpl{
+    display:flex; align-items:center; gap:10px; padding:9px 11px;
+    border:1px solid var(--border); border-radius:var(--radius-sm); background:#fafafa;
+  }
+  .tpl.cur{border-color:var(--primary-border); background:var(--primary-bg);}
+  .tpl.bad{border-color:var(--error-border); background:var(--error-bg);}
+  .tpl .grow{flex:1; min-width:0;}
+  .tpl .nm{font-size:13px; font-weight:500; color:var(--text); display:flex; align-items:center; gap:6px;}
+  .tpl .nm code{font-size:11px; background:#f0f0f0; color:var(--text-3); padding:1px 5px; border-radius:3px; font-weight:400;}
+  .tpl .sub{font-size:12px; color:var(--text-3); margin-top:3px;}
+  .tpl .mini{
+    height:26px; padding:0 9px; font-size:12px; border-radius:4px;
+    border:1px solid var(--border-2); background:#fff; cursor:pointer; color:var(--text-2); white-space:nowrap;
+  }
+  .tpl .mini:hover{border-color:var(--primary); color:var(--primary);}
+  .tpl .mini.del:hover{border-color:var(--error); color:var(--error);}
+  .tpl .mini[disabled]{opacity:.45; cursor:not-allowed;}
+
+  .fld{display:flex; flex-direction:column; gap:5px;}
+  .fld>label{font-size:12px; color:var(--text-3);}
+  .fld input,.fld select{
+    height:32px; padding:0 10px; border:1px solid var(--border-2); border-radius:var(--radius-sm);
+    font-size:13px; font-family:inherit; color:var(--text); background:var(--container);
+  }
+  .fld input:focus,.fld select:focus{outline:none; border-color:var(--primary); box-shadow:0 0 0 2px rgba(22,119,255,.1);}
+  .fld .hint{font-size:12px; color:var(--text-4);}
+  .fld-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .sect-t{font-size:12px; color:var(--text-3); display:flex; align-items:center; gap:8px;}
+  .sect-t::after{content:''; flex:1; height:1px; background:var(--border);}
+
+  /* ===== 主体四栏 ===== */
+  .body{
+    height:calc(100% - var(--header));
+    display:grid;
+    grid-template-columns:var(--rail) var(--pool) minmax(0,1fr) var(--props);
+  }
+
+  /* 左侧图标条 */
+  .rail{
+    background:var(--container); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; align-items:center; padding-top:8px; gap:4px;
+  }
+  .rail-item{
+    width:36px; height:36px; border-radius:var(--radius-sm); border:none; background:transparent;
+    display:grid; place-items:center; cursor:pointer; color:var(--text-3);
+    transition:all .2s;
+  }
+  .rail-item:hover{background:#f5f5f5; color:var(--text-2);}
+  .rail-item.active{background:var(--primary-bg); color:var(--primary);}
+
+  /* 组件库面板 */
+  .pool{
+    background:var(--container); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .pool-head{
+    padding:12px 14px 8px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .pool-head h3{margin:0; font-size:14px; font-weight:600;}
+  .pool-head .cnt{
+    font-size:12px; color:var(--text-3); background:#f5f5f5;
+    border-radius:10px; padding:0 8px; line-height:18px;
+  }
+  .pool-head .ph-right{display:flex; align-items:center; gap:6px;}
+  .pool-head .def{
+    font-size:12px; color:var(--text-3); text-decoration:none; line-height:18px;
+    border:1px solid var(--border-2); border-radius:10px; padding:0 8px; background:var(--container);
+  }
+  .pool-head .def:hover{border-color:var(--primary); color:var(--primary);}
+  .pool-search{margin:0 14px 10px; position:relative;}
+  .pool-search input{
+    width:100%; height:30px; padding:0 10px 0 28px; font-size:13px;
+    border:1px solid var(--border-2); border-radius:var(--radius-sm); outline:none;
+    transition:all .2s; background:var(--container);
+  }
+  .pool-search input:focus{border-color:var(--primary); box-shadow:0 0 0 2px rgba(22,119,255,.1);}
+  .pool-search svg{position:absolute; left:9px; top:8px; color:var(--text-4);}
+
+  .pool-list{flex:1; overflow-y:auto; padding:0 14px 20px;}
+  .pool-group{margin-bottom:14px;}
+  .pool-group h4{
+    margin:0 0 8px; font-size:12px; font-weight:500; color:var(--text-3);
+    display:flex; align-items:center; gap:6px;
+  }
+  .pool-group h4::after{content:''; flex:1; height:1px; background:var(--border);}
+  .pool-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+
+  .comp{
+    display:flex; align-items:center; gap:6px;
+    height:42px; padding:0 8px; border:1px solid var(--border);
+    border-radius:var(--radius-sm); background:var(--container); cursor:pointer;
+    text-align:left; transition:all .18s; overflow:hidden;
+  }
+  .comp:hover{border-color:var(--primary); background:var(--primary-bg); box-shadow:0 2px 6px rgba(22,119,255,.12);}
+  .comp.used{opacity:.42; cursor:default; background:#fafafa;}
+  .comp.used:hover{border-color:var(--border); background:#fafafa; box-shadow:none;}
+  .comp svg{flex:0 0 16px; color:var(--text-3);}
+  .comp:hover svg{color:var(--primary);}
+  .comp span{
+    font-size:12px; color:var(--text-2); line-height:1.25;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .comp:hover span{color:var(--primary);}
+
+  /* 画布 */
+  .canvas-wrap{
+    position:relative; overflow:auto; min-width:0;
+    background-color:var(--bg-canvas);
+    background-image:radial-gradient(circle, #d9d9d9 1px, transparent 1px);
+    background-size:16px 16px;
+    padding:28px 24px 120px;
+  }
+  .canvas{max-width:600px; margin:0 auto; position:relative;}
+
+  .canvas-bar{
+    max-width:600px; margin:0 auto 12px;
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:12px; color:var(--text-3);
+  }
+  .canvas-bar .tag{
+    display:inline-flex; align-items:center; gap:5px;
+    background:var(--container); border:1px solid var(--border);
+    border-radius:10px; padding:2px 9px; font-size:12px; color:var(--text-2);
+  }
+
+  .node{
+    position:relative;
+    display:flex; align-items:center; gap:10px;
+    background:var(--container);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:10px 12px;
+    cursor:grab;
+    transition:border-color .18s, box-shadow .18s, transform .06s;
+    user-select:none;
+  }
+  .node:hover{border-color:var(--primary-border); box-shadow:var(--shadow-lg);}
+  .node.sel{
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px rgba(22,119,255,.14), var(--shadow);
+  }
+  .node.dragging{opacity:.9; transform:scale(.995);}
+
+  /* 连线：节点之间的竖向线 + 箭头，不占 DOM */
+  .node:not(:first-child){margin-top:34px;}
+  .node:not(:first-child)::before{
+    content:''; position:absolute; left:23px; top:-34px; width:2px; height:34px;
+    background:var(--border-2);
+  }
+  .node:not(:first-child)::after{
+    content:''; position:absolute; left:19px; top:-9px;
+    width:7px; height:7px; border-right:2px solid var(--border-2); border-bottom:2px solid var(--border-2);
+    transform:rotate(45deg); background:var(--bg-canvas);
+  }
+
+  .node-idx{
+    flex:0 0 24px; width:24px; height:24px; border-radius:50%;
+    background:var(--primary-bg); color:var(--primary);
+    font-size:12px; font-weight:500; line-height:24px; text-align:center;
+  }
+  .node.sel .node-idx{background:var(--primary); color:#fff;}
+
+  .node-ico{
+    flex:0 0 28px; width:28px; height:28px; border-radius:var(--radius-sm);
+    background:#fafafa; display:grid; place-items:center; color:var(--text-3);
+  }
+  .node-main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px;}
+  .node-title{font-size:14px; color:var(--text); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .node-code{font-size:11px; color:var(--text-4); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; line-height:1.3;}
+
+  .node-flag{
+    flex:0 0 auto; font-size:12px; line-height:18px; padding:0 8px; border-radius:4px;
+    background:#fafafa; border:1px solid var(--border); color:var(--text-3);
+  }
+  .node-flag.running{background:var(--primary-bg); border-color:var(--primary-border); color:var(--primary);}
+  .node-flag.completed{background:var(--success-bg); border-color:var(--success-border); color:#389e0d;}
+  .node-flag.failed{background:var(--error-bg); border-color:var(--error-border); color:#cf1322;}
+  .node-flag.skipped{background:var(--warning-bg); border-color:var(--warning-border); color:#d48806;}
+
+  .node-del{
+    flex:0 0 20px; width:20px; height:20px; border:none; background:transparent;
+    color:var(--text-4); cursor:pointer; border-radius:4px; display:grid; place-items:center;
+    transition:all .15s; font-size:13px; line-height:1;
+  }
+  .node-del:hover{color:var(--error); background:var(--error-bg);}
+
+  .empty-canvas{
+    max-width:600px; margin:60px auto; text-align:center; color:var(--text-3);
+    border:1px dashed var(--border-2); border-radius:var(--radius);
+    padding:48px 20px; background:rgba(255,255,255,.6);
+  }
+  .empty-canvas .big{font-size:15px; color:var(--text-2); margin-bottom:6px;}
+
+  /* 属性面板 */
+  .props{
+    background:var(--container); border-left:1px solid var(--border);
+    display:flex; flex-direction:column; min-height:0;
+  }
+  .props-tabs{
+    display:flex; border-bottom:1px solid var(--border); padding:0 14px; gap:18px;
+  }
+  .props-tab{
+    border:none; background:transparent; padding:12px 0 10px; font-size:14px;
+    color:var(--text-2); cursor:pointer; position:relative;
+  }
+  .props-tab.active{color:var(--primary); font-weight:500;}
+  .props-tab.active::after{
+    content:''; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--primary);
+  }
+  .props-body{flex:1; overflow-y:auto; padding:14px;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; color:var(--text-2); margin-bottom:6px;}
+  .field .val{font-size:13px; color:var(--text);}
+  .field .val.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; color:var(--text-2);}
+
+  .inp, select.inp{
+    width:100%; height:32px; padding:0 10px; font-size:14px;
+    border:1px solid var(--border-2); border-radius:var(--radius-sm);
+    outline:none; background:var(--container); color:var(--text); transition:all .2s;
+  }
+  .inp:focus{border-color:var(--primary); box-shadow:0 0 0 2px rgba(22,119,255,.1);}
+  .inp[readonly]{background:#fafafa; color:var(--text-2);}
+
+  .seg{display:flex; gap:0; border:1px solid var(--border-2); border-radius:var(--radius-sm); overflow:hidden;}
+  .seg button{
+    flex:1; height:30px; border:none; background:var(--container); font-size:13px;
+    color:var(--text-2); cursor:pointer; transition:all .18s;
+  }
+  .seg button + button{border-left:1px solid var(--border-2);}
+  .seg button.on{background:var(--primary); color:#fff;}
+
+  .switch-row{display:flex; align-items:center; justify-content:space-between;}
+  .switch{
+    width:40px; height:20px; border-radius:10px; background:rgba(0,0,0,.25);
+    position:relative; cursor:pointer; transition:background .2s; border:none; padding:0;
+  }
+  .switch::after{
+    content:''; position:absolute; top:2px; left:2px; width:16px; height:16px;
+    border-radius:50%; background:#fff; transition:transform .2s;
+    box-shadow:0 2px 4px rgba(0,35,11,.2);
+  }
+  .switch.on{background:var(--primary);}
+  .switch.on::after{transform:translateX(20px);}
+
+  .props-empty{
+    text-align:center; color:var(--text-3); font-size:13px;
+    padding:48px 12px;
+  }
+  .props-empty .ico{color:var(--text-4); margin-bottom:10px;}
+
+  .divider{height:1px; background:var(--border); margin:16px -14px;}
+  .props-foot{
+    border-top:1px solid var(--border); padding:12px 14px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .props-foot .btn{width:100%; justify-content:center;}
+
+  /* 滚动条 */
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:#d9d9d9; border-radius:4px;}
+  ::-webkit-scrollbar-thumb:hover{background:#bfbfbf;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="back" title="返回">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+  <span class="title">工序编排</span>
+  <span class="divider"></span>
+  <span class="crumb">产线配置 / 执行流程</span>
+  <span class="divider"></span>
+  <span class="flow-pick">
+    <label for="flowSel">模板</label>
+    <select id="flowSel" title="选择要编辑的流程模板"></select>
+    <button class="btn" id="btnFlowMgr" title="新建 / 重命名 / 删除模板">管理</button>
+    <a class="btn" href="system-config.html" title="PLC / 机床 / 料架 / 夹爪 / 数据库等设备参数">参数</a>
+  </span>
+  <span class="spacer"></span>
+  <span class="run-state" id="runState"><span class="dot"></span><span id="runText">未运行</span></span>
+  <button class="btn" id="btnStop">停止</button>
+  <button class="btn" id="btnSave">仅保存</button>
+  <button class="btn btn-primary" id="btnStart">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    保存并启动
+  </button>
+</header>
+
+<div class="body">
+
+  <!-- 左图标条 -->
+  <nav class="rail">
+    <button class="rail-item active" title="环节库">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    </button>
+    <button class="rail-item" title="执行参数" id="railParam">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.5.55.87 1.07 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </nav>
+
+  <!-- 环节库 -->
+  <aside class="pool">
+    <div class="pool-head">
+      <h3>环节库</h3>
+      <div class="ph-right">
+        <span class="cnt" id="poolCount">0</span>
+        <a class="def" href="node-types-editor.html" title="编辑环节定义（node-types.json）：加环节、改属性字段">定义</a>
+      </div>
+    </div>
+    <div class="pool-search">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="poolSearch" placeholder="搜索环节">
+    </div>
+    <div class="pool-list" id="poolList"></div>
+  </aside>
+
+  <!-- 画布 -->
+  <main class="canvas-wrap" id="canvasWrap">
+    <div class="canvas-bar">
+      <span class="tag">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        <span id="canvasCount">0 个环节</span>
+      </span>
+      <span>拖动节点调整顺序 · 点击选中可在右侧改参数</span>
+    </div>
+    <div class="canvas" id="canvas"></div>
+  </main>
+
+  <!-- 属性面板 -->
+  <aside class="props">
+    <div class="props-tabs">
+      <button class="props-tab active" data-tab="node">节点属性</button>
+      <button class="props-tab" data-tab="global">执行参数</button>
+    </div>
+    <div class="props-body" id="propsBody"></div>
+    <div class="props-foot" id="propsFoot"></div>
+  </aside>
+
+</div>
+
+<!-- ===== 模板管理弹窗（必须在脚本之前，bind() 执行时要能取到这些元素） ===== -->
+<div class="mask" id="flowMask">
+  <div class="dlg">
+    <div class="dlg-h">
+      <h3>流程模板</h3>
+      <button class="x" id="flowClose" title="关闭">&times;</button>
+    </div>
+    <div class="dlg-b">
+      <div class="sect-t">现有模板</div>
+      <div class="tpl-list" id="flowList"></div>
+
+      <div class="sect-t">新建模板</div>
+      <div class="fld-row">
+        <div class="fld">
+          <label for="newName">标识（文件名，字母/数字/下划线）</label>
+          <input id="newName" placeholder="例如 electrode_v2" maxlength="32" spellcheck="false">
+        </div>
+        <div class="fld">
+          <label for="newDisplay">显示名（可中文）</label>
+          <input id="newDisplay" placeholder="例如 电极线试产流程" maxlength="40">
+        </div>
+      </div>
+      <div class="fld">
+        <label for="newFrom">起始内容</label>
+        <select id="newFrom">
+          <option value="__current">复制当前模板（推荐）</option>
+          <option value="">空白模板（环节全部停用）</option>
+        </select>
+        <span class="hint">模板就是 flows 目录下的一个 json 文件，运维可以直接改文件，改完刷新页面即生效。</span>
+      </div>
+      <div>
+        <button class="btn btn-primary" id="btnNewFlow">创建模板</button>
+      </div>
+    </div>
+    <div class="dlg-f">
+      <button class="btn" id="flowDone">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="../lib/sortable.min.js"></script>
+<script src="renderer.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ==================== 元数据 ====================
+  // 环节定义来自 /api/node-types（即 node-types.json）。
+  // 下面的 FALLBACK_GROUPS 只在接口不可用时兜底，正常路径不读它 —— 加环节只需改 JSON。
+  var META = null;
+
+  var FALLBACK_GROUPS = [
+    { key: 'scan',  name: '扫描与料架', icon: 'scan',
+      items: ['scan_preset', 'scan', 'rackoperate'] },
+    { key: 'load',  name: '上料与装夹', icon: 'down',
+      items: ['prepare_material', 'load_machine', 'change_machine', 'fill_fixture', 'load_aluminum'] },
+    { key: 'unload',name: '下料与卸料', icon: 'up',
+      items: ['unload_machine', 'unload_material', 'unload_aluminum'] },
+    { key: 'knife', name: '刀具管理', icon: 'wrench',
+      items: ['change_knife', 'prepare_knife', 'sendkniferequest'] }
+  ];
+
+  function loadMeta() {
+    return fetch('/api/node-types', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { META = (j && j.nodes) ? j : null; })
+      .catch(function () { META = null; });
+  }
+
+  // 当前分组列表：优先 meta，退化为兜底常量
+  function groups() {
+    if (META && META.groups && META.groups.length) {
+      return META.groups.map(function (g) {
+        return { key: g.key, name: g.name, icon: g.icon };
+      });
+    }
+    return FALLBACK_GROUPS;
+  }
+
+  // 按标识查节点定义
+  function nodeOf(name) {
+    if (!META || !META.nodes) return null;
+    for (var i = 0; i < META.nodes.length; i++) {
+      if (META.nodes[i].key === name) return META.nodes[i];
+    }
+    return null;
+  }
+
+  // 某个环节是否属于指定分组
+  function inGroup(name, key) {
+    var n = nodeOf(name);
+    if (n) return n.group === key;
+    var g = groupOf(name);
+    return !!g && g.key === key;
+  }
+
+  var ICONS = {
+    scan:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3M3 12h18"/></svg>',
+    down:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v13M7 11l5 5 5-5M4 21h16"/></svg>',
+    up:     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V8M7 13l5-5 5 5M4 3h16"/></svg>',
+    wrench: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3z"/><path d="M14.7 6.3l3-3"/></svg>',
+    box:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>'
+  };
+
+  function iconOf(name) {
+    var g = groupOf(name);
+    if (g) return ICONS[g.icon] || ICONS.box;
+    return ICONS.box;
+  }
+
+  function groupOf(name) {
+    var gs = groups();
+    var n = nodeOf(name);
+    if (n) {
+      for (var i = 0; i < gs.length; i++) if (gs[i].key === n.group) return gs[i];
+      return null;
+    }
+    // 降级：meta 拿不到时按兜底常量的 items 反查
+    for (var j = 0; j < FALLBACK_GROUPS.length; j++) {
+      if (FALLBACK_GROUPS[j].items.indexOf(name) >= 0) return FALLBACK_GROUPS[j];
+    }
+    return null;
+  }
+
+  // ==================== 状态 ====================
+  var S = {
+    mode: 'once',
+    simulate: true,
+    loopIntervalMs: 1000,
+    steps: [],        // 流程中的环节
+    available: [],    // 池子里的环节
+    all: {},          // name -> 完整环节（含池子的）
+    selected: null,
+    running: false,
+    paused: false,
+    tab: 'node'
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var canvasEl, poolEl, propsBody, propsFoot;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function selOf(name) {
+    for (var i = 0; i < S.steps.length; i++) if (S.steps[i].name === name) return S.steps[i];
+    return null;
+  }
+
+  // ==================== 渲染：环节库 ====================
+  function renderPool() {
+    var kw = ($('poolSearch').value || '').trim().toLowerCase();
+    var used = {};
+    S.steps.forEach(function (s) { used[s.name] = true; });
+
+    var html = '';
+    var total = 0;
+
+    groups().forEach(function (g) {
+      var items = S.available.filter(function (a) {
+        return inGroup(a.name, g.key) &&
+          (!kw || a.name.toLowerCase().indexOf(kw) >= 0 || (a.display || '').toLowerCase().indexOf(kw) >= 0);
+      });
+      if (!items.length) return;
+      total += items.length;
+      html += '<div class="pool-group"><h4>' + g.name + '</h4><div class="pool-grid">';
+      items.forEach(function (a) {
+        html += '<button class="comp" data-name="' + esc(a.name) + '" title="' + esc(a.display) + '">' +
+                  iconOf(a.name) + '<span>' + esc(a.display) + '</span>' +
+                '</button>';
+      });
+      html += '</div></div>';
+    });
+
+    // 未归类的
+    var others = S.available.filter(function (a) {
+      return !groupOf(a.name) &&
+        (!kw || a.name.toLowerCase().indexOf(kw) >= 0 || (a.display || '').toLowerCase().indexOf(kw) >= 0);
+    });
+    if (others.length) {
+      total += others.length;
+      html += '<div class="pool-group"><h4>其他</h4><div class="pool-grid">';
+      others.forEach(function (a) {
+        html += '<button class="comp" data-name="' + esc(a.name) + '" title="' + esc(a.display) + '">' +
+                  iconOf(a.name) + '<span>' + esc(a.display) + '</span>' +
+                '</button>';
+      });
+      html += '</div></div>';
+    }
+
+    if (!html) {
+      html = '<div style="text-align:center;color:rgba(0,0,0,.45);font-size:13px;padding:32px 8px;line-height:1.7">' +
+             (S.available.length ? '没有匹配的环节' : '全部环节已在流程中') + '</div>';
+    }
+
+    $('poolList').innerHTML = html;
+    $('poolCount').textContent = S.available.length;
+  }
+
+  // ==================== 渲染：画布 ====================
+  function renderCanvas() {
+    var html = '';
+
+    if (!S.steps.length) {
+      html = '<div class="empty-canvas">' +
+               '<div class="big">流程还是空的</div>' +
+               '<div>从左侧环节库点选，把环节加进来</div>' +
+             '</div>';
+      canvasEl.innerHTML = html;
+      $('canvasCount').textContent = '0 个环节';
+      return;
+    }
+
+    S.steps.forEach(function (s, i) {
+      var st = s.status || 'idle';
+      var stText = s.statusText || '待执行';
+      html += '<div class="node' + (S.selected === s.name ? ' sel' : '') + '" data-name="' + esc(s.name) + '">' +
+                '<span class="node-idx">' + (i + 1) + '</span>' +
+                '<span class="node-ico">' + iconOf(s.name) + '</span>' +
+                '<span class="node-main">' +
+                  '<span class="node-title">' + esc(s.display || s.name) + '</span>' +
+                  '<span class="node-code">' + esc(s.name) + '</span>' +
+                '</span>' +
+                '<span class="node-flag ' + st + '">' + esc(stText) + '</span>' +
+                '<button class="node-del" data-del="' + esc(s.name) + '" title="移回环节库">✕</button>' +
+              '</div>';
+    });
+
+    canvasEl.innerHTML = html;
+    $('canvasCount').textContent = S.steps.length + ' 个环节';
+
+    if (!canvasEl.__sortable) {
+      canvasEl.__sortable = Sortable.create(canvasEl, {
+        animation: 160,
+        filter: '.node-del',
+        preventOnFilter: false,
+        ghostClass: 'dragging',
+        onEnd: function () {
+          var order = Array.prototype.map.call(
+            canvasEl.querySelectorAll('.node'),
+            function (n) { return n.getAttribute('data-name'); }
+          );
+          var map = {};
+          S.steps.forEach(function (x) { map[x.name] = x; });
+          var next = [];
+          order.forEach(function (n) { if (map[n]) { next.push(map[n]); delete map[n]; } });
+          Object.keys(map).forEach(function (k) { next.push(map[k]); });
+          S.steps = next;
+          renderCanvas();
+          renderProps();
+        }
+      });
+    }
+  }
+
+  // ==================== 渲染：属性面板 ====================
+  function renderProps() {
+    var tab = S.tab;
+    if (tab === 'global') return renderGlobal();
+
+    var s = S.selected ? selOf(S.selected) : null;
+    if (!s) {
+      propsBody.innerHTML =
+        '<div class="props-empty">' +
+          '<div class="ico"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 18l-6-6 6-6"/></svg></div>' +
+          '在画布中选中一个环节<br>这里会显示它的运行参数' +
+        '</div>';
+      propsFoot.innerHTML = '';
+      return;
+    }
+
+    propsBody.innerHTML =
+      '<div class="field"><label>环节名称</label><div class="val">' + esc(s.display || s.name) + '</div></div>' +
+      '<div class="field"><label>标识</label><div class="val mono">' + esc(s.name) + '</div></div>' +
+      '<div class="divider"></div>' +
+      '<div id="nrHost"></div>';
+
+    propsFoot.innerHTML = '';
+
+    // 字段声明来自 node-types.json，这里不再手写任何一个控件
+    var fields = (typeof NodeRenderer !== 'undefined') ? NodeRenderer.fieldsFor(META, s.name) : [];
+
+    if (fields.length && typeof NodeRenderer !== 'undefined') {
+      NodeRenderer.render($('nrHost'), fields, s, function (name, val, all) {
+        for (var k in all) s[k] = all[k];
+      });
+    } else {
+      // 降级：接口或渲染器不可用时，退回原来手写的四个字段
+      $('nrHost').innerHTML =
+        '<div class="field">' +
+          '<label>超时时间（秒）</label>' +
+          '<input class="inp" type="number" min="1" max="7200" id="fTimeout" value="' + (s.timeoutSec || 300) + '">' +
+        '</div>' +
+        '<div class="field">' +
+          '<label>失败后</label>' +
+          '<div class="seg" id="fOnFail">' +
+            '<button data-v="stop" class="' + (s.onFail === 'skip' ? '' : 'on') + '">停在当前步</button>' +
+            '<button data-v="skip" class="' + (s.onFail === 'skip' ? 'on' : '') + '">跳过继续</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="field">' +
+          '<label>仿真耗时（毫秒）</label>' +
+          '<input class="inp" type="number" min="100" step="100" id="fSimMs" value="' + (s.simMs || 3000) + '">' +
+        '</div>' +
+        '<div class="field">' +
+          '<div class="switch-row">' +
+            '<label style="margin:0">模拟失败</label>' +
+            '<button class="switch ' + (s.simFail ? 'on' : '') + '" id="fSimFail"></button>' +
+          '</div>' +
+        '</div>';
+
+      $('fTimeout').addEventListener('change', function () {
+        s.timeoutSec = Math.max(1, parseInt(this.value, 10) || 300);
+        this.value = s.timeoutSec;
+      });
+      $('fSimMs').addEventListener('change', function () {
+        s.simMs = Math.max(100, parseInt(this.value, 10) || 3000);
+        this.value = s.simMs;
+      });
+      $('fOnFail').addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-v]');
+        if (!b) return;
+        s.onFail = b.getAttribute('data-v');
+        Array.prototype.forEach.call(this.children, function (c) {
+          c.classList.toggle('on', c === b);
+        });
+      });
+      $('fSimFail').addEventListener('click', function () {
+        s.simFail = !s.simFail;
+        this.classList.toggle('on', s.simFail);
+      });
+    }
+  }
+
+  function renderGlobal() {
+    propsBody.innerHTML =
+      '<div class="field">' +
+        '<label>执行模式</label>' +
+        '<div class="seg" id="gMode">' +
+          '<button data-v="once" class="' + (S.mode === 'once' ? 'on' : '') + '">单次</button>' +
+          '<button data-v="loop" class="' + (S.mode === 'loop' ? 'on' : '') + '">轮播</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="field">' +
+        '<div class="switch-row">' +
+          '<label style="margin:0">仿真模式</label>' +
+          '<button class="switch ' + (S.simulate ? 'on' : '') + '" id="gSim"></button>' +
+        '</div>' +
+        '<div style="font-size:12px;color:rgba(0,0,0,.45);margin-top:6px">开启后不启动真实子程序，只按仿真耗时走完流程</div>' +
+      '</div>' +
+      '<div class="field">' +
+        '<label>轮播间隔（毫秒）</label>' +
+        '<input class="inp" type="number" min="100" step="100" id="gLoop" value="' + (S.loopIntervalMs || 1000) + '">' +
+      '</div>' +
+      '<div class="divider"></div>' +
+      '<div class="field">' +
+        '<label>流程概览</label>' +
+        '<div class="val">共 ' + S.steps.length + ' 个环节，环节库剩余 ' + S.available.length + ' 个</div>' +
+      '</div>';
+
+    propsFoot.innerHTML = '';
+
+    $('gMode').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-v]');
+      if (!b) return;
+      S.mode = b.getAttribute('data-v');
+      Array.prototype.forEach.call(this.children, function (c) { c.classList.toggle('on', c === b); });
+    });
+    $('gSim').addEventListener('click', function () {
+      S.simulate = !S.simulate;
+      this.classList.toggle('on', S.simulate);
+      updateRunState();
+    });
+    $('gLoop').addEventListener('change', function () {
+      S.loopIntervalMs = Math.max(100, parseInt(this.value, 10) || 1000);
+      this.value = S.loopIntervalMs;
+    });
+  }
+
+  function updateRunState() {
+    var el = $('runState');
+    var txt = $('runText');
+    if (S.running) {
+      el.className = 'run-state' + (S.paused ? ' warn' : ' on');
+      txt.textContent = S.paused ? '已暂停' : ('运行中 · ' + (S.mode === 'loop' ? '轮播' : '单次'));
+    } else {
+      el.className = 'run-state';
+      txt.textContent = '未运行 · ' + (S.simulate ? '仿真' : '真实');
+    }
+  }
+
+  // ==================== 数据 ====================
+  function applyPlan(j) {
+    S.mode = j.mode || 'once';
+    S.simulate = !!j.simulate;
+    S.loopIntervalMs = j.loopIntervalMs || 1000;
+    S.steps = j.steps || [];
+    S.available = j.available || [];
+    S.all = {};
+    S.steps.concat(S.available).forEach(function (s) { S.all[s.name] = s; });
+    if (S.selected && !selOf(S.selected)) S.selected = null;
+  }
+
+  function loadPlan() {
+    return fetch('/api/workflow/plan', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.success) return;
+        applyPlan(j);
+        S.running = !!j.running;
+        S.paused = !!j.paused;
+        // 默认选中第一个环节，右侧属性面板不至于空着
+        if (!S.selected && S.steps.length) {
+          var pick = null;
+          var hash = (location.hash || '').replace('#', '');
+          if (hash && selOf(hash)) pick = hash;
+          S.selected = pick || S.steps[0].name;
+        }
+        renderAll();
+      });
+  }
+
+  function pollStatus() {
+    fetch('/api/workflow/status', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.success) return;
+        var changed = (S.running !== !!j.running) || (S.paused !== !!j.paused);
+        S.running = !!j.running;
+        S.paused = !!j.paused;
+        if (changed) updateRunState();
+
+        // 运行状态变了就刷新模板下拉的可用性（运行中禁止切换）
+        if (FLOWS.running !== !!j.running) {
+          FLOWS.running = !!j.running;
+          renderFlowSel();
+          if ($('flowMask').classList.contains('on')) renderFlowList();
+        }
+
+        // 同步每个环节状态
+        var byName = {};
+        (j.steps || []).forEach(function (s) { byName[s.name] = s; });
+        var dirty = false;
+        S.steps.forEach(function (s) {
+          var n = byName[s.name];
+          if (n && (s.status !== n.status || s.statusText !== n.statusText)) {
+            s.status = n.status;
+            s.statusText = n.statusText || s.statusText;
+            dirty = true;
+          }
+        });
+        if (dirty || changed) renderCanvas();
+      })
+      .catch(function () {});
+  }
+
+  function payload() {
+    return {
+      mode: S.mode,
+      simulate: S.simulate,
+      loopIntervalMs: S.loopIntervalMs,
+      steps: S.steps.map(function (s) {
+        return {
+          name: s.name, display: s.display, enabled: true,
+          timeoutSec: s.timeoutSec, onFail: s.onFail,
+          simMs: s.simMs, simFail: s.simFail
+        };
+      })
+    };
+  }
+
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (r) { return r.json(); });
+  }
+
+  // ==================== 流程模板 ====================
+  // 模板 = flows 目录下一个 json 文件，格式与旧 flow.json 完全一致。
+  // 切换模板只是改"当前读写哪个文件"，编排页所有接口自动跟着走。
+  var FLOWS = { current: '', running: false, items: [] };
+
+  function loadFlows() {
+    return fetch('/api/flows', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.success) return;
+        FLOWS = j;
+        renderFlowSel();
+        if ($('flowMask').classList.contains('on')) renderFlowList();
+      })
+      .catch(function () {});
+  }
+
+  function flowLabel(t) {
+    var s = t.display || t.name;
+    if (t.name !== s) s += ' (' + t.name + ')';
+    if (t.broken) s += ' ⚠ 读取失败';
+    return s;
+  }
+
+  function renderFlowSel() {
+    var sel = $('flowSel');
+    if (!sel) return;
+    if (!FLOWS.items || !FLOWS.items.length) {
+      sel.innerHTML = '<option>（无模板）</option>';
+      sel.disabled = true;
+      return;
+    }
+    sel.innerHTML = FLOWS.items.map(function (t) {
+      return '<option value="' + esc(t.name) + '"' + (t.current ? ' selected' : '') + '>' +
+        esc(flowLabel(t)) + '</option>';
+    }).join('');
+    sel.disabled = !!FLOWS.running;
+    sel.title = FLOWS.running ? '工作流运行中，停止后才能切换模板' : '选择要编辑的流程模板';
+  }
+
+  function renderFlowList() {
+    var host = $('flowList');
+    if (!host) return;
+    if (!FLOWS.items || !FLOWS.items.length) {
+      host.innerHTML = '<div style="font-size:12px;color:var(--text-3)">还没有模板</div>';
+      return;
+    }
+    host.innerHTML = FLOWS.items.map(function (t) {
+      var cls = 'tpl' + (t.current ? ' cur' : '') + (t.broken ? ' bad' : '');
+      var sub = t.broken
+        ? '文件解析失败，请检查该 json 的格式'
+        : (t.stepCount + ' 个环节，启用 ' + t.enabledCount + ' 个 · ' +
+           (t.simulate ? '仿真' : '真实') + ' · 改于 ' + t.mtime);
+      var disp = t.display || t.name;
+      return '<div class="' + cls + '" data-name="' + esc(t.name) + '">' +
+        '<div class="grow">' +
+          '<div class="nm">' + esc(disp) +
+            (t.name !== disp ? ' <code>' + esc(t.name) + '</code>' : '') +
+            (t.current ? ' <span style="font-size:11px;color:var(--primary)">当前</span>' : '') +
+          '</div>' +
+          '<div class="sub">' + esc(sub) + '</div>' +
+        '</div>' +
+        '<button class="mini" data-act="use"' + (t.current ? ' disabled' : '') + '>使用</button>' +
+        '<button class="mini" data-act="rename" data-display="' + esc(disp) + '">改名</button>' +
+        '<button class="mini del" data-act="del"' + (t.current ? ' disabled' : '') + '>删除</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function switchFlow(name) {
+    if (!name) return Promise.resolve();
+    if (name === FLOWS.current) { renderFlowSel(); return Promise.resolve(); }
+    if (FLOWS.running) {
+      toast('工作流运行中，请先停止再切换模板', false);
+      renderFlowSel();
+      return Promise.resolve();
+    }
+    return post('/api/flows/switch', { name: name })
+      .then(function (j) {
+        if (!j || !j.success) { toast((j && j.message) || '切换失败', false); return loadFlows(); }
+        toast('已切换到 ' + name, true);
+        S.selected = null;
+        return loadFlows().then(loadPlan);
+      })
+      .catch(function () { toast('切换失败', false); loadFlows(); });
+  }
+
+  function openFlowMgr() {
+    $('flowMask').classList.add('on');
+    $('newName').value = '';
+    $('newDisplay').value = '';
+    $('newFrom').value = '__current';
+    loadFlows().then(renderFlowList);
+    setTimeout(function () { $('newName').focus(); }, 30);
+  }
+  function closeFlowMgr() { $('flowMask').classList.remove('on'); }
+
+  function createFlow() {
+    var name = ($('newName').value || '').trim();
+    var display = ($('newDisplay').value || '').trim();
+    var from = $('newFrom').value;
+
+    if (!/^[A-Za-z0-9_-]{1,32}$/.test(name)) {
+      toast('标识只能用字母、数字、下划线、连字符（中文填在显示名）', false);
+      $('newName').focus();
+      return;
+    }
+
+    var body = { name: name, display: display };
+    if (from !== '__current') body.from = '';
+
+    post('/api/flows/create', body)
+      .then(function (j) {
+        if (!j || !j.success) { toast((j && j.message) || '创建失败', false); return; }
+        toast('已创建 ' + name, true);
+        $('newName').value = '';
+        $('newDisplay').value = '';
+        switchFlow(name).then(renderFlowList);
+      })
+      .catch(function () { toast('创建失败', false); });
+  }
+
+  function renameFlowDisplay(name, oldDisplay) {
+    var v = window.prompt('新的显示名（可中文，标识 ' + name + ' 不变）', oldDisplay || name);
+    if (v === null) return;
+    v = v.trim();
+    if (!v) { toast('显示名不能为空', false); return; }
+    post('/api/flows/rename', { name: name, display: v })
+      .then(function (j) {
+        if (!j || !j.success) { toast((j && j.message) || '改名失败', false); return; }
+        toast('已改名', true);
+        loadFlows().then(renderFlowList);
+      })
+      .catch(function () { toast('改名失败', false); });
+  }
+
+  function deleteFlow(name) {
+    if (!window.confirm('确定删除模板 ' + name + ' ？\n该模板的编排配置会一并删除，不能撤销。')) return;
+    post('/api/flows/delete', { name: name })
+      .then(function (j) {
+        if (!j || !j.success) { toast((j && j.message) || '删除失败', false); return; }
+        toast('已删除 ' + name, true);
+        loadFlows().then(renderFlowList);
+      })
+      .catch(function () { toast('删除失败', false); });
+  }
+
+  function toast(msg, ok) {
+    var d = document.createElement('div');
+    d.textContent = msg;
+    d.style.cssText = 'position:fixed;left:50%;top:64px;transform:translateX(-50%);' +
+      'background:' + (ok === false ? '#fff2f0' : '#f6ffed') + ';' +
+      'border:1px solid ' + (ok === false ? '#ffccc7' : '#b7eb8f') + ';' +
+      'color:' + (ok === false ? '#cf1322' : '#389e0d') + ';' +
+      'padding:7px 16px;border-radius:6px;font-size:13px;z-index:99;box-shadow:0 6px 16px rgba(0,0,0,.08)';
+    document.body.appendChild(d);
+    setTimeout(function () { d.remove(); }, 2200);
+  }
+
+  // ==================== 交互 ====================
+  function addStep(name) {
+    if (selOf(name)) return;
+    var src = null;
+    for (var i = 0; i < S.available.length; i++) {
+      if (S.available[i].name === name) { src = S.available[i]; break; }
+    }
+    if (!src) return;
+    var n = nodeOf(name) || {};
+    var seed = {
+      name: name,
+      display: src.display || n.display || name,
+      enabled: true,
+      status: 'idle', statusText: '待执行'
+    };
+    // 通用字段默认值来自 node-types.json 的 commonFields
+    var cf = (META && META.commonFields) || [];
+    cf.forEach(function (f) { seed[f.name] = f['default']; });
+    // 降级：meta 不可用时沿用后端返回的值
+    if (!cf.length) {
+      seed.timeoutSec = src.timeoutSec || 300;
+      seed.onFail = src.onFail || 'stop';
+      seed.simMs = src.simMs || 3000;
+      seed.simFail = !!src.simFail;
+    }
+    S.steps.push(seed);
+    S.available = S.available.filter(function (a) { return a.name !== name; });
+    S.selected = name;
+    S.tab = 'node';
+    syncTabs();
+    renderPool();
+    renderCanvas();
+    renderProps();
+  }
+
+  function removeStep(name) {
+    var s = selOf(name);
+    if (!s) return;
+    S.steps = S.steps.filter(function (x) { return x.name !== name; });
+    S.available.push({
+      name: s.name, display: s.display, enabled: false,
+      timeoutSec: s.timeoutSec, onFail: s.onFail,
+      simMs: s.simMs, simFail: s.simFail, status: 'idle', statusText: '待执行'
+    });
+    if (S.selected === name) S.selected = null;
+    renderPool();
+    renderCanvas();
+    renderProps();
+  }
+
+  function renderAll() {
+    renderPool();
+    renderCanvas();
+    renderProps();
+    updateRunState();
+  }
+
+  function syncTabs() {
+    Array.prototype.forEach.call(document.querySelectorAll('.props-tab'), function (t) {
+      t.classList.toggle('active', t.getAttribute('data-tab') === S.tab);
+    });
+  }
+
+  function bind() {
+    canvasEl = $('canvas');
+    poolEl = $('poolList');
+    propsBody = $('propsBody');
+    propsFoot = $('propsFoot');
+
+    // 环节库点击
+    poolEl.addEventListener('click', function (e) {
+      var b = e.target.closest('.comp');
+      if (!b) return;
+      addStep(b.getAttribute('data-name'));
+    });
+
+    $('poolSearch').addEventListener('input', renderPool);
+
+    // 画布点击：选中 / 删除
+    canvasEl.addEventListener('click', function (e) {
+      var del = e.target.closest('[data-del]');
+      if (del) {
+        e.stopPropagation();
+        removeStep(del.getAttribute('data-del'));
+        return;
+      }
+      var node = e.target.closest('.node');
+      if (!node) { S.selected = null; renderCanvas(); renderProps(); return; }
+      S.selected = node.getAttribute('data-name');
+      S.tab = 'node';
+      syncTabs();
+      renderCanvas();
+      renderProps();
+    });
+
+    // 属性页签
+    Array.prototype.forEach.call(document.querySelectorAll('.props-tab'), function (t) {
+      t.addEventListener('click', function () {
+        S.tab = t.getAttribute('data-tab');
+        syncTabs();
+        renderProps();
+      });
+    });
+
+    $('railParam').addEventListener('click', function () {
+      S.tab = 'global';
+      syncTabs();
+      renderProps();
+    });
+
+    // 顶部动作
+    $('btnSave').addEventListener('click', function () {
+      post('/api/workflow/plan/save', payload())
+        .then(function (j) { toast(j && j.success ? '编排已保存' : ((j && j.message) || '保存失败'), !!(j && j.success)); })
+        .catch(function () { toast('保存失败', false); });
+    });
+
+    $('btnStart').addEventListener('click', function () {
+      post('/api/workflow/plan/start', payload())
+        .then(function (j) {
+          if (j && j.success) {
+            toast('已启动', true);
+            S.running = true;
+            updateRunState();
+            pollStatus();
+          } else {
+            toast((j && j.message) || '启动失败', false);
+          }
+        })
+        .catch(function () { toast('启动失败', false); });
+    });
+
+    $('btnStop').addEventListener('click', function () {
+      post('/api/workflow/stop', {})
+        .then(function (j) {
+          toast(j && j.success ? '已停止' : ((j && j.message) || '停止失败'), !!(j && j.success));
+          S.running = false;
+          updateRunState();
+          pollStatus();
+        })
+        .catch(function () { toast('停止失败', false); });
+    });
+
+    // ===== 流程模板 =====
+    $('flowSel').addEventListener('change', function () { switchFlow(this.value); });
+    $('btnFlowMgr').addEventListener('click', openFlowMgr);
+    $('flowClose').addEventListener('click', closeFlowMgr);
+    $('flowDone').addEventListener('click', closeFlowMgr);
+    $('flowMask').addEventListener('click', function (e) { if (e.target === this) closeFlowMgr(); });
+    $('btnNewFlow').addEventListener('click', createFlow);
+    $('newName').addEventListener('keydown', function (e) { if (e.key === 'Enter') createFlow(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && $('flowMask').classList.contains('on')) closeFlowMgr();
+    });
+
+    $('flowList').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b || b.disabled) return;
+      var row = b.closest('.tpl');
+      if (!row) return;
+      var name = row.getAttribute('data-name');
+      var act = b.getAttribute('data-act');
+      if (act === 'use') switchFlow(name);
+      else if (act === 'del') deleteFlow(name);
+      else if (act === 'rename') renameFlowDisplay(name, b.getAttribute('data-display'));
+    });
+  }
+
+  // ==================== 启动 ====================
+  bind();
+  loadFlows();
+  loadMeta().then(loadPlan).catch(function () {
+    canvasEl.innerHTML = '<div class="empty-canvas"><div class="big">读不到编排数据</div><div>确认主控程序已启动（端口 8888）</div></div>';
+  });
+  setInterval(pollStatus, 2000);
+
+  window.__wfS = S;
+})();
+</script>
+
+</body>
+</html>

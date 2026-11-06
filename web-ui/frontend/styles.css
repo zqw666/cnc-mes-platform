@@ -91,6 +91,8 @@ body,html{height:100%}
 .devices{display:flex;gap:24px;align-items:flex-start;justify-content:space-between;flex:1 1 0}
 .device-card{background:#fff;border:1px solid #e6e9ee;padding:8px;border-radius:8px;flex:1 1 0;width:30%;height:60vh;box-shadow:0 1px 4px rgba(20,30,60,0.04);text-align:center;display:flex;flex-direction:column}
 .device-card img{width:100%;height:100%;flex:1 1 auto;min-height:0;object-fit:scale-down;border-radius:6px}
+.device-title{font-weight:600;font-size:14px;color:#243140;text-align:center;padding:4px 0}
+.device-card.offline{filter:grayscale(1);opacity:.55}
 /* 状态文字放在图片下方，并保证高度一致使两侧水平对齐 */
 .device-status{margin-top:8px;padding:6px 4px;height:46px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#243140}
 
@@ -104,6 +106,7 @@ body,html{height:100%}
 .status.running{background:#fff4e5;color:#b86a00}
 .status.paused{background:#fff0f6;color:#b0003a}
 .status.stopped{background:#ffecec;color:#8b0000}
+.status.offline{background:#f0f0f0;color:#8c8c8c}
 .work-stats{margin:28px 0 56px;padding:12px}
 .stat-row{display:flex;gap:0;flex-wrap:nowrap;justify-content:space-between;align-items:stretch;width:100%}
 .stat-item{background:#fff;padding:16px;border-radius:8px;flex:1 1 0;min-width:0;text-align:center;border:1px solid #eef1f6;margin:0 12px}
@@ -132,6 +135,8 @@ body,html{height:100%}
 .status-legend{display:flex;gap:12px;flex-wrap:wrap}
 .legend-item{display:flex;align-items:center;gap:4px;font-size:12px;color:#333}
 .icon{width:16px;height:16px;border-radius:4px;border:1px solid #ccc}
+.icon.disabled{background-color:#262626;border-color:#000}
+.icon.no-material{background-color:#d9d9d9;border-color:#bfbfbf}
 .shelf-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:12px;padding:16px}
 .shelf-item{display:flex;flex-direction:column;gap:4px;padding:8px;border:2px solid #333;border-radius:4px;background:#fff;min-height:100px;position:relative}
 .shelf-checkbox{position:absolute;top:4px;right:4px;width:16px;height:16px;cursor:pointer;z-index:10}
@@ -142,9 +147,10 @@ body,html{height:100%}
 .shelf-item[data-status="pending"]{background-color: #faad14;border-color: #d48806;color:#fff}
 .shelf-item[data-status="completed"]{background-color: #52c41a;border-color: #389e0d;color:#fff}
 .shelf-item[data-status="to-scan"]{background-color: #8c8c8c;border-color: #595959;color:#fff}
-.shelf-item[data-status="no-material"]{background-color: #262626;border-color: #000;color:#fff}
+.shelf-item[data-status="no-material"]{background-color: #d9d9d9;border-color: #bfbfbf;color:#666}
+.shelf-item[data-status="scan-failed"]{background-color: #f5222d;border-color: #cf1322;color:#fff}
 .shelf-item[data-status="error"]{background-color: #f5222d;border-color: #cf1322;color:#fff}
-.shelf-item[data-status="disabled"]{background-color: #d9d9d9;border-color: #bfbfbf;color:#666}
+.shelf-item[data-status="disabled"]{background-color: #262626;border-color: #000;color:#fff}
 .shelf-item[data-status="urgent"]{background-color: #fa8c16;border-color: #d46b08;color:#fff}
 
 /* 料位信息行 */
@@ -162,6 +168,7 @@ body,html{height:100%}
 .status-text-completed::before{content:"已完成"}
 .status-text-to-scan::before{content:"待扫描"}
 .status-text-no-material::before{content:"无料"}
+.status-text-scan-failed::before{content:"扫描失败"}
 .status-text-error::before{content:"错误"}
 .status-text-disabled::before{content:"禁用"}
 .status-text-urgent::before{content:"急件"}
@@ -559,4 +566,35 @@ body,html{height:100%}
   .field-wide {
     grid-column: span 1;
   }
+}
+
+/* 夹爪关联料架多选 */
+.rack-check-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 6px 8px;
+  border: 1px solid #e6e9ee;
+  border-radius: 6px;
+  background: #fafbfd;
+}
+.rack-check-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+}
+.rack-check-item input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #2b79ff;
+}
+.config-hint {
+  font-size: 12px;
+  color: #b0b8c9;
+  padding: 6px 0;
 }

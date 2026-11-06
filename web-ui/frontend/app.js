@@ -39,18 +39,14 @@ new Vue({
       { key: 'electrode', label: '电极料架' },
       { key: 'tool', label: '刀具料架' },
       { key: 'steel', label: '钢件料架' },
-      { key: 'pallet', label: '托盘料架' }
+      { key: 'aluminum', label: '铝板电极料架' }
     ],
     shelfActiveTab: 'electrode',
-    shelves: { electrode: [], tool: [], steel: [], pallet: [] },
-    shelfRacktypeMap: { electrode: 1, tool: 3, steel: 2, pallet: 4 },
-    shelfDefaultSlots: { electrode: 80, tool: 20, steel: 12, pallet: 16 },
+    shelves: { electrode: [], tool: [], steel: [], aluminum: [] },
+    shelfRacktypeMap: { electrode: 1, tool: 3, steel: 2, aluminum: 5 },
+    shelfDefaultSlots: { electrode: 80, tool: 20, steel: 12, aluminum: 6 },
     // 线体配置板块
     lineConfig: {
-      rackType: 'fixed',
-      rackCount: 1,
-      rackLayers: 3,
-      rackSlots: 6,
       gripperType: 'fixed-single',
       grabMode: 'A-grab-B-place',
       palletEnabled: false,
@@ -62,7 +58,8 @@ new Vue({
       pallet: { slotPhoto: '', grabTaskNo: '', placeTaskNo: '', photoStart: '' },
       preset: { photo: '', manual: '', openRequest: '', openAllow: '', grabTaskNo: '', placeTaskNo: '', doorLock: '' },
       rotary: { rotate: '', zero: '', grabTaskNo: '', placeTaskNo: '', arrive: '' },
-      cleaner: { photo: '', grabTaskNo: '', placeTaskNo: '' }
+      cleaner: { photo: '', grabTaskNo: '', placeTaskNo: '' },
+      machine: { startTaskNo: '' }
     },
     racksConfig: [],
     machinesConfig: [],
@@ -308,8 +305,10 @@ new Vue({
         if (!res.success) { this.shelfFillDefault(); return; }
         var allRows = Array.isArray(res.data && res.data.rack_administrate) ? res.data.rack_administrate : [];
         this.shelfTypes.forEach(function(t) {
+          // racktype 为数字：1=电极 2=钢件 3=刀具 4=托盘
+          var racktypeNum = self.shelfRacktypeMap[t.key];
           var rows = allRows.filter(function(r) {
-            return (r.racktype || '').toString().toLowerCase() === t.key;
+            return Number(r.racktype) === racktypeNum;
           }).sort(function(a, b) { return a.id - b.id; });
           var arr = [];
           for (var i = 1; i <= self.shelfDefaultSlots[t.key]; i++) {
@@ -318,8 +317,8 @@ new Vue({
               id: Number(row.id), rfid: row.rfid || '', posstatus: Number(row.posstatus || 0),
               workstate: Number(row.workstate || 0), scanstatus: Number(row.scanstatus || 0),
               priority: Number(row.priority || 0), racknum: Number(row.racknum || 1),
-              activated: false, selected: false
-            } : { id: i, rfid: '', posstatus: 0, workstate: 0, scanstatus: 0, priority: 0, racknum: 1, activated: false, selected: false });
+              workpiecename: row.workpiecename || '', activated: false, selected: false
+            } : { id: i, rfid: '', posstatus: 0, workstate: 0, scanstatus: 0, priority: 0, racknum: 1, workpiecename: '', activated: false, selected: false });
           }
           self.shelves[t.key] = arr;
         });
@@ -329,21 +328,20 @@ new Vue({
       }
     },
     shelfStatusOf(row, type) {
-      if (type === 'steel') {
-        if (row.scanstatus === 0) return 'to-scan';
-        if (row.workstate === 1) return 'processing';
-        if (row.workstate === 2) return 'completed';
-        if (row.priority === 1) return 'urgent';
-        if (row.posstatus === 1) return 'pending';
-        return 'no-material';
-      }
+      // 加工中/加工完成优先（工件在机床，料位 posstatus=1）
       if (row.workstate === 1) return 'processing';
       if (row.workstate === 2) return 'completed';
-      if (row.posstatus === 1) return 'pending';
-      return 'no-material';
+      // 有工件在料架（posstatus=2）：读 scanstatus
+      if (row.posstatus === 2) {
+        if (row.scanstatus === 0) return 'to-scan';     // 待扫描
+        if (row.scanstatus === 2) return 'scan-failed'; // 扫描失败
+        return 'pending';                                // 扫描成功 → 待加工
+      }
+      // 无工件：posstatus=0 禁用，posstatus=1 无料
+      return row.posstatus === 0 ? 'disabled' : 'no-material';
     },
     getStatusText(status) {
-      var map = { processing: '加工中', pending: '待加工', completed: '已完成', 'to-scan': '待扫描', 'no-material': '无料', error: '错误', disabled: '禁用', urgent: '急件' };
+      var map = { processing: '加工中', pending: '待加工', completed: '已完成', 'to-scan': '待扫描', 'no-material': '无料', 'scan-failed': '扫描失败', error: '错误', disabled: '禁用', urgent: '急件' };
       return map[status] || status;
     },
     shelfToggleSelect(type, shelf) { shelf.selected = !shelf.selected; },
@@ -361,19 +359,10 @@ new Vue({
         if (res.success) {
           var self = this;
           selected.forEach(function(s) {
-            s.selected = false;
-            if (type === 'steel') {
-              if (status === 'no-material') s.posstatus = 0;
-              else if (status === 'disable') { s.posstatus = 0; s.workstate = 0; s.scanstatus = 0; }
-              else if (status === 'urgent') s.priority = 1;
-              else if (status === 'activate') s.scanstatus = 1;
-              else if (status === 'lock') s.scanstatus = 0;
-            } else {
-              if (status === 'no-material') s.posstatus = 0;
-              else if (status === 'disable') { s.posstatus = 0; s.workstate = 0; }
-              else if (status === 'activate') s.workstate = 1;
-              else if (status === 'lock') s.workstate = 0;
-            }
+            s.selected = false;   // 重置选中单选框（料位保持激活状态）
+            if (status === 'disable') { s.posstatus = 0; s.workstate = 0; s.scanstatus = 0; }        // 禁用
+            else if (status === 'no-material') { s.posstatus = 1; s.workstate = 0; s.scanstatus = 0; } // 无料
+            else if (status === 'urgent') s.priority = 1;
           });
           this.toast('状态已更新', 'success');
         } else { this.toast(res.message || '更新失败', 'error'); }
@@ -395,6 +384,7 @@ new Vue({
       rack.grabStartTaskNo = rack.grabStartTaskNo || rack.grabTaskNo || '';
       rack.placeStartTaskNo = rack.placeStartTaskNo || rack.placeTaskNo || '';
       rack.scanStartTaskNo = rack.scanStartTaskNo || '';
+      rack.photoResetSignal = rack.photoResetSignal || '';
       return rack;
     },
     async loadLineConfig() {
@@ -413,10 +403,6 @@ new Vue({
 
         var line = (raw && raw.line) || (mapped && mapped.line) || {};
         this.lineConfig = {
-          rackType: line.rackType || 'fixed',
-          rackCount: line.rackCount != null ? line.rackCount : 1,
-          rackLayers: line.rackLayers != null ? line.rackLayers : 3,
-          rackSlots: line.rackSlots != null ? line.rackSlots : 6,
           gripperType: line.gripperType || 'fixed-single',
           grabMode: line.grabMode || 'A-grab-B-place',
           palletEnabled: line.palletEnabled === true || line.palletEnabled === 'yes',
@@ -431,7 +417,7 @@ new Vue({
             return {
               id: id, type: m.type || 'roders', number: m.number != null ? m.number : '1',
               ip: m.ip || '', port: m.port != null ? m.port : '', stationCount: m.stationCount != null ? m.stationCount : 4,
-              ncPath: m.ncPath || '', sessionUrl: m.sessionUrl || '', username: m.username || '', password: m.password || ''
+              ncPath: m.ncPath || '', sessionUrl: m.sessionUrl || '', username: m.username || '', password: m.password || '', startProcessSignal: m.startProcessSignal || ''
             };
           });
           this.racksConfig = Array.isArray(raw.racks) ? raw.racks.map(this.normalizeRack) : [];
@@ -451,12 +437,14 @@ new Vue({
         var preset = signals.preset || {};
         var rotary = signals.rotary || {};
         var cleaner = signals.cleaner || {};
+        var machine = signals.machine || {};
         this.plcSignals = {
           robot: { photo: robot.photo || '', taskStart: robot.taskStart || '', taskDone: robot.taskDone || '', taskNumber: robot.taskNumber || '', error: robot.error || '', safePos: robot.safePos || '', estop: robot.estop || '' },
           pallet: { slotPhoto: pallet.slotPhoto || '', grabTaskNo: pallet.grabTaskNo || '', placeTaskNo: pallet.placeTaskNo || '', photoStart: pallet.photoStart || '' },
           preset: { photo: preset.photo || '', manual: preset.manual || '', openRequest: preset.openRequest || '', openAllow: preset.openAllow || '', grabTaskNo: preset.grabTaskNo || '', placeTaskNo: preset.placeTaskNo || '', doorLock: preset.doorLock || '' },
           rotary: { rotate: rotary.rotate || '', zero: rotary.zero || '', grabTaskNo: rotary.grabTaskNo || '', placeTaskNo: rotary.placeTaskNo || '', arrive: rotary.arrive || '' },
-          cleaner: { photo: cleaner.photo || '', grabTaskNo: cleaner.grabTaskNo || '', placeTaskNo: cleaner.placeTaskNo || '' }
+          cleaner: { photo: cleaner.photo || '', grabTaskNo: cleaner.grabTaskNo || '', placeTaskNo: cleaner.placeTaskNo || '' },
+          machine: { startTaskNo: machine.startTaskNo || '' }
         };
 
         this.workflowConfig = (mapped && Array.isArray(mapped.workflow)) ? mapped.workflow.map(function(w) {
@@ -469,10 +457,6 @@ new Vue({
     collectLineConfig() {
       return {
         line: {
-          rackType: this.lineConfig.rackType,
-          rackCount: parseInt(this.lineConfig.rackCount) || 1,
-          rackLayers: parseInt(this.lineConfig.rackLayers) || 3,
-          rackSlots: parseInt(this.lineConfig.rackSlots) || 6,
           gripperType: this.lineConfig.gripperType,
           grabMode: this.lineConfig.grabMode,
           palletEnabled: !!this.lineConfig.palletEnabled,
@@ -510,7 +494,7 @@ new Vue({
       this.racksConfig = [];
       this.machinesConfig = [];
       this.grippersConfig = [];
-      this.lineConfig = { rackType: 'fixed', rackCount: 1, rackLayers: 3, rackSlots: 6, gripperType: 'fixed-single', grabMode: 'A-grab-B-place', palletEnabled: false, palletSlots: 4 };
+      this.lineConfig = { gripperType: 'fixed-single', grabMode: 'A-grab-B-place', palletEnabled: false, palletSlots: 4 };
       this.plcConfig = { ip: '', port: 9600 };
       this.toast('已重置，点击保存配置生效', 'info');
     },
@@ -519,17 +503,18 @@ new Vue({
         id: Date.now() + Math.floor(Math.random() * 1000),
         type: 'electrode',
         name: '料架' + (this.racksConfig.length + 1),
-        number: this.racksConfig.length + 1,
-        rows: 8,
-        cols: 10,
-        photoSignal: '',
+        number: String(this.racksConfig.length + 1),
+        rows: '8',
+        cols: '10',
+        photoStartSignal: '',
         openRequest: '',
         openSignal: '',
         doorClosed: '',
         doorFlag: '',
         grabStartTaskNo: '',
         placeStartTaskNo: '',
-        scanStartTaskNo: ''
+        scanStartTaskNo: '',
+        photoResetSignal: ''
       });
     },
     removeRack(index) { this.racksConfig.splice(index, 1); },
@@ -544,7 +529,8 @@ new Vue({
         ncPath: '',
         sessionUrl: '',
         username: '',
-        password: ''
+        password: '',
+        startProcessSignal: ''
       });
     },
     removeMachine(index) { this.machinesConfig.splice(index, 1); },
@@ -620,19 +606,6 @@ new Vue({
         if (!configName && !subItem) return;
         if (configName === '线体配置' || subItem) {
           switch (subItem) {
-            case '料架类型':
-              var rackTypeMap = { '固定料架': 'fixed', '旋转料架': 'rotating' };
-              self.lineConfig.rackType = rackTypeMap[value] || 'fixed';
-              break;
-            case '料架个数':
-              if (!isNaN(parseInt(value))) self.lineConfig.rackCount = parseInt(value);
-              break;
-            case '料架层数':
-              if (!isNaN(parseInt(value))) self.lineConfig.rackLayers = parseInt(value);
-              break;
-            case '料架每层料位数':
-              if (!isNaN(parseInt(value))) self.lineConfig.rackSlots = parseInt(value);
-              break;
             case '夹爪类型':
               var gripperMap = { '固定单爪': 'fixed-single', '固定双爪': 'fixed-double', '快换爪（电极）': 'quick-electrode', '快换爪（刀具）': 'quick-tool', '快换爪（托盘）': 'quick-pallet' };
               self.lineConfig.gripperType = gripperMap[value] || 'fixed-single';
@@ -658,11 +631,7 @@ new Vue({
         var lc = this.lineConfig;
         var data = [
           ['配置项名称', '配置项细分', '具体数值'],
-          ['线体配置', '料架类型', lc.rackType === 'fixed' ? '固定料架' : '旋转料架'],
-          ['', '料架个数', lc.rackCount],
-          ['', '料架层数', lc.rackLayers],
-          ['', '料架每层料位数', lc.rackSlots],
-          ['', '夹爪类型', this.gripperTypeName],
+          ['线体配置', '夹爪类型', this.gripperTypeName],
           ['', '抓取方式', lc.grabMode === 'A-grab-B-place' ? 'A抓B放' : 'B抓A放'],
           ['', '随行台有无', lc.palletEnabled ? '有' : '无'],
           ['', '随行台料位数', lc.palletSlots],

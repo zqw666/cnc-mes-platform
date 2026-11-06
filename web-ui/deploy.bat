@@ -1,13 +1,43 @@
 @echo off
-REM deploy.bat - sync frontend files to bin
-echo === Deploy frontend to bin ===
+REM deploy.bat - sync the whole frontend folder into the build output dir.
+REM Equivalent to the CopyFrontend target in MachineMonitor.csproj, but runnable by hand.
+REM
+REM NOTE: paths are relative to this script (%~dp0). Do NOT hardcode absolute paths -
+REM       the old version pointed at D:\...\erp\... which is a DIFFERENT copy of the project,
+REM       so running it silently deployed to the wrong place.
+setlocal EnableExtensions
+
+set "ROOT=%~dp0"
+set "SRC=%ROOT%frontend"
+set "DST=%ROOT%backend\bin\Any CPU\Debug\net472"
+
+if not exist "%SRC%" (
+  echo [ERR] source not found: %SRC%
+  exit /b 1
+)
+if not exist "%DST%" (
+  echo [ERR] output dir not found: %DST%
+  echo       Build the backend first, then re-run this script:
+  echo         dotnet build "%ROOT%backend\MachineMonitor.csproj"
+  exit /b 1
+)
+
+echo Source : %SRC%
+echo Target : %DST%
 echo.
-copy /y "D:\桌面\erp\前后端分离\web-ui\frontend\index.html" "D:\桌面\erp\前后端分离\web-ui\backend\bin\Any CPU\Debug\net472\index.html" >nul
-copy /y "D:\桌面\erp\前后端分离\web-ui\frontend\script.js" "D:\桌面\erp\前后端分离\web-ui\backend\bin\Any CPU\Debug\net472\script.js" >nul
-copy /y "D:\桌面\erp\前后端分离\web-ui\frontend\styles.css" "D:\桌面\erp\前后端分离\web-ui\backend\bin\Any CPU\Debug\net472\styles.css" >nul
-copy /y "D:\桌面\erp\前后端分离\web-ui\frontend\格力.png" "D:\桌面\erp\前后端分离\web-ui\backend\bin\Any CPU\Debug\net472\格力.png" >nul
-copy /y "D:\桌面\erp\前后端分离\web-ui\frontend\机器人.png" "D:\桌面\erp\前后端分离\web-ui\backend\bin\Any CPU\Debug\net472\机器人.png" >nul
-copy /y "D:\桌面\erp\前后端分离\web-ui\frontend\料架.png" "D:\桌面\erp\前后端分离\web-ui\backend\bin\Any CPU\Debug\net472\料架.png" >nul
-copy /y "D:\桌面\erp\前后端分离\web-ui\frontend\罗德斯.png" "D:\桌面\erp\前后端分离\web-ui\backend\bin\Any CPU\Debug\net472\罗德斯.png" >nul
+
+REM /E  recurse incl. empty dirs      /XO only overwrite when source is newer
+REM /XD skip bin obj .git            /XF skip editor backups
+robocopy "%SRC%" "%DST%" /E /XO /XD bin obj .git /XF *.bak *.bak-* /NFL /NDL /NJH /NJS
+set "RC=%ERRORLEVEL%"
+
+REM robocopy exit codes: 0-7 = success, >=8 = real failure
+if %RC% GEQ 8 (
+  echo.
+  echo [ERR] robocopy failed, exit code %RC%
+  exit /b %RC%
+)
+
 echo.
-echo All files deployed.
+echo Done. Frontend synced to output dir.
+endlocal

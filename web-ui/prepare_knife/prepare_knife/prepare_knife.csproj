@@ -37,7 +37,7 @@
       <HintPath>..\..\lib\DataCommonOperate.dll</HintPath>
     </Reference>
     <Reference Include="PLC">
-      <HintPath>..\..\PLC\PLC\bin\Debug\PLC.dll</HintPath>
+      <HintPath>..\..\lib\PLC.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

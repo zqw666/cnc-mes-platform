@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>低代码平台月度进展汇报台账 - MachineMonitor</title>
+<style>
+  :root{
+    --primary:#1677ff; --primary-bg:#e6f4ff; --primary-border:#91caff;
+    --bg:#f5f5f5; --container:#fff;
+    --border:#e8e8e8; --border-2:#d9d9d9;
+    --text:rgba(0,0,0,.88); --text-2:rgba(0,0,0,.65); --text-3:rgba(0,0,0,.45);
+    --success:#52c41a; --success-bg:#f6ffed; --success-border:#b7eb8f;
+    --error:#ff4d4f;   --error-bg:#fff2f0;   --error-border:#ffccc7;
+    --warning:#faad14; --warning-bg:#fffbe6; --warning-border:#ffe58f;
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;
+    font-size:14px; line-height:1.72; -webkit-font-smoothing:antialiased;}
+  .page{max-width:1180px; margin:0 auto; padding:32px 24px 70px;}
+
+  header.doc{background:var(--container); border:1px solid var(--border); border-radius:var(--radius);
+    padding:24px 28px; margin-bottom:18px;}
+  header.doc h1{margin:0 0 8px; font-size:24px; font-weight:700;}
+  header.doc .sub{font-size:14px; color:var(--text-2); margin-bottom:14px;}
+  header.doc .meta{font-size:12.5px; color:var(--text-3); display:flex; gap:18px; flex-wrap:wrap;
+    border-top:1px dashed var(--border-2); padding-top:12px;}
+  header.doc .meta b{font-weight:600; color:var(--text-2);}
+
+  section{background:var(--container); border:1px solid var(--border); border-radius:var(--radius);
+    padding:20px 24px; margin-bottom:16px; break-inside:avoid;}
+  section h2{margin:0 0 4px; font-size:17px; font-weight:700; display:flex; align-items:center; gap:10px;}
+  section h2 .num{display:inline-grid; place-items:center; width:25px; height:25px; border-radius:7px;
+    background:var(--primary); color:#fff; font-size:13px; font-weight:600; flex:0 0 25px;}
+  section .desc{font-size:13px; color:var(--text-3); margin:0 0 14px; padding-left:35px;}
+
+  table{border-collapse:collapse; width:100%; font-size:13px;}
+  th,td{border:1px solid var(--border); padding:8px 10px; text-align:left; vertical-align:top;}
+  th{background:#fafafa; font-weight:600; color:var(--text-2); white-space:nowrap;}
+  tr{break-inside:avoid;}
+  td.c{text-align:center; white-space:nowrap;}
+  code{font-family:Consolas,'Courier New',monospace; font-size:12px; background:#f5f5f5;
+    padding:1px 4px; border-radius:3px; color:#c7254e;}
+  .tag{display:inline-block; font-size:11px; padding:0 6px; border-radius:9px; line-height:17px;
+    font-weight:500; white-space:nowrap; border:1px solid;}
+  .t-done{background:var(--success-bg); border-color:var(--success-border); color:#389e0d;}
+  .t-plan{background:var(--primary-bg); border-color:var(--primary-border); color:#0958d9;}
+  .callout{border-radius:var(--radius); padding:12px 16px; margin-top:12px; font-size:13px; line-height:1.8;}
+  .co-warn{background:var(--warning-bg); border:1px solid var(--warning-border);}
+  .co-ok{background:var(--success-bg); border:1px solid var(--success-border);}
+  .callout .t{font-weight:600; display:block; margin-bottom:4px;}
+  ul{margin:6px 0 0; padding-left:20px;}
+  li{margin:3px 0;}
+  .small{font-size:12.5px; color:var(--text-3);}
+  .lead{font-weight:500;}
+
+  @media print{
+    @page{size:A4 landscape; margin:12mm;}
+    body{background:#fff; font-size:11.5px; line-height:1.5;}
+    .page{max-width:none; padding:0;}
+    section,header.doc{border:1px solid #ccc; margin-bottom:8px; padding:10px 14px;}
+    section h2{font-size:14px;}
+    th,td{padding:4px 6px; font-size:10.5px;}
+    code{font-size:10px;}
+    .tag{border:1px solid #666 !important; background:#fff !important; color:#000 !important;}
+    .no-print{display:none !important;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc">
+  <h1>低代码平台月度进展汇报台账</h1>
+  <div class="sub">MachineMonitor · 流程编排与配置化改造 · 22 个工作日每日话术</div>
+  <div class="meta">
+    <span><b>周期</b>　按 30 天自然月计，只列 22 个工作日，周末不单列</span>
+    <span><b>口径</b>　混合：前 12 天已落地、后 10 天为真实待办；总量均摊到 22 天</span>
+    <span><b>组织方式</b>　按一个工程师的推进顺序编排：由底向上、每层三拍、风险最高放最后</span>
+    <span><b>格式</b>　每天一句大白话，右边那列不用念</span>
+    <span><b>范围</b>　仅汇报表，不改动项目代码与文档</span>
+    <span><b>整理日期</b>　2026-11-06</span>
+  </div>
+</header>
+
+<section>
+  <h2><span class="num">0</span>使用说明</h2>
+  <p class="desc">状态列必须保留：前段写「已完成」，后段写「待办」。时态不能混用。被问「为什么这么排」翻第 1 节，被问「为什么做了三个页面」翻第 4 节。</p>
+  <table>
+    <tr><th style="width:110px">项</th><th>说明</th></tr>
+    <tr><td>已落地</td><td>D01–D12。每天对应一个真实完成的模块或交付物，左列用「完成 / 验证 / 输出」。</td></tr>
+    <tr><td>待办</td><td>D13–D22。每天对应一个确实还没做的事项，左列用「计划 / 安排 / 推进 / 核对」，不得写成已完成。</td></tr>
+    <tr><td>平均口径</td><td>每天仍是 <b>2 件事</b>、22 天共 44 件，只是不再编号、不写术语，改成能开口说的白话；累计进度按 100/22 折算，每工作日约 <b>4.5%</b>。状态分段保持不变。</td></tr>
+    <tr><td>两列分工</td><td>左列照着念就行，两句话说清做了什么、试过没、明天干啥；右列别念，被追问时用来支撑，指向具体文件、接口或验证结论。</td></tr>
+    <tr><td>统一句式</td><td><b>今天把…弄好了，顺手把…也试了一遍，没问题。明天接着弄…</b> 两句大白话，每天长度接近；待办日把「弄好了」换成「打算把…过一遍」。</td></tr>
+    <tr><td>顺序不能换</td><td>这六段不是排得好看，是每段都有前置依赖。第 1 节列了「反过来做会怎样」，被追问顺序时照那里答，别临场编。</td></tr>
+    <tr><td>要主动讲一个坑</td><td>D09 或 D11 挑一个讲：改了没生效、保存丢了字段。讲一个真实的坑，比列十个功能可信。</td></tr>
+  </table>
+  <div class="callout co-warn">
+    <span class="t">混合口径唯一的风险点</span>
+    前 12 天是倒推的已完成工作，后 10 天是真实计划。两者必须在状态列显式区分，且不能出现「第 13 天完成了第 5 天产出的验证」这类自相矛盾的时间线。周报按周汇总时，同样要标注本周哪些是完成、哪些是安排。
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">1</span>推进逻辑：六段依赖链</h2>
+  <p class="desc">这不是任务清单，是有依赖关系的六段。每段都能答出「为什么必须现在做、为什么不能反过来」，被追问顺序时照这张表说。</p>
+  <table>
+    <tr><th style="width:118px">段</th><th style="width:84px">台账日</th><th style="width:45%">为什么必须排在这一段</th><th>反过来做会怎样</th></tr>
+    <tr>
+      <td><b>一、摸底与定调</b></td><td class="c">D01–D02</td>
+      <td>现场有 5 份项目副本、没有测试、没有文档。先得确认「改哪份能生效、现在界面读的是哪些数据」，否则改完不生效，两天白干。这段的产出是判断，不是代码。</td>
+      <td>直接动手改：很可能改在废弃副本上，现场看不到任何变化，还得重来。</td>
+    </tr>
+    <tr>
+      <td><b>二、流程层</b></td><td class="c">D03–D06</td>
+      <td>流程文件是所有编排页面的公共底座。先把它改成可读多份、可切换，后面每做一个页面都能直接读；界面形态到 D06 才动手定，因为它依赖流程结构已经稳定。</td>
+      <td>先做界面：界面读的字段还在变，做完就废，等于重做两遍。</td>
+    </tr>
+    <tr>
+      <td><b>三、环节层</b></td><td class="c">D07–D09</td>
+      <td>环节的字段结构不定，渲染器就没法写；渲染器不写好，属性面板还得手写一遍。这两件事是硬依赖，顺序不能换。</td>
+      <td>先写渲染器：结构没定，渲染器要写出好几套分支，结构一改全崩。</td>
+    </tr>
+    <tr>
+      <td><b>四、参数层</b></td><td class="c">D10–D11</td>
+      <td>三层里最大的一块，但套路已经被前两层验证过，照同一节拍复制，风险最低、速度最快。</td>
+      <td>提前做：占掉大半个周期，而且做的时候还不知道通用字段该怎么定。</td>
+    </tr>
+    <tr>
+      <td><b>五、加固与交付</b></td><td class="c">D12</td>
+      <td>三层都通了才看得清兜底链路错在哪；而且改子程序要重编译重部署，只能停机做，必须等前面稳下来。</td>
+      <td>早改：代码还在变、反复重编，且看不到真正被错用的那条路径。</td>
+    </tr>
+    <tr>
+      <td><b>六、人工点验与收口</b></td><td class="c">D13–D22</td>
+      <td>前面全是接口级验证，页面一次都没人点过。必须留出整段连续时间，而且只能排在所有页面做完之后。</td>
+      <td>穿插着点：页面还在改，点完又变，记录没有意义。</td>
+    </tr>
+  </table>
+  <div class="callout co-ok">
+    <span class="t">被问「你是怎么排这个顺序的」——照这段说</span>
+    我先花两天把现状摸清楚，因为有好几份副本，得先确认改哪份能生效。然后按「流程、环节、参数」三层往上做，每层都是先让数据跑通、再做界面、最后补校验，因为界面是读结构的，结构一变界面就得重做。三层做完才动子程序，因为改子程序要停机。最后留十天专门点页面，前面全是接口级验证，界面确实一次都没人工点过。
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">2</span>四周里程碑（周报用）</h2>
+  <p class="desc">22 个工作日 ≈ 4 周 + 2 天收尾，收尾两天并入第 4 周表述。</p>
+  <table>
+    <tr><th style="width:100px">周次</th><th style="width:90px">工作日</th><th>一句话里程碑</th></tr>
+    <tr><td>第 1 周</td><td>D01–D05</td><td>完成现状盘点与方案定型，打通多套流程模板，一条产线可复制成多套流程并安全切换。</td></tr>
+    <tr><td>第 2 周</td><td>D06–D10</td><td>编排界面定形并接上模板切换，环节定义闭环落地、系统参数页开工，改配置不用重编译。</td></tr>
+    <tr><td>第 3 周</td><td>D11–D15</td><td>根治夹爪静默错用故障，完成部署脚本与三份交付文档，启动浏览器端人工点验。</td></tr>
+    <tr><td>第 4 周</td><td>D16–D22</td><td>汇总回归结果、统一文档口径、建立 Git 基线、实测部署脚本，按上线核对清单完成月度验收。</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">3</span>逐日台账（22 个工作日）</h2>
+  <p class="desc">左列可直接作为日报原文；右列为技术依据，被追问时引用。每天还是两件事、份量相当，但改成顺口的大白话，不编号、不甩术语；累计进度每工作日约 4.5%。备查列不用念，被追问时再翻。</p>
+  <table>
+    <tr>
+      <th style="width:48px">Day</th>
+      <th style="width:60px">状态</th>
+      <th style="width:52px">累计</th>
+      <th style="width:48%">每天怎么说（照着念就行）</th>
+      <th>备查（被问到再翻，不用念）</th>
+    </tr>
+    <tr><td class="c">D01</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">4.5%</td>
+      <td class="lead">今天把这套系统从头摸了一遍：还是老一套 C# 程序，十几个小程序各干各的，前端连打包工具都没有。翻出好几份项目副本，两份配置居然不是同一条产线。顺手把原来那条流程的编排页跑起来看了看，步骤能读出来，但界面就是张普通表格。明天捋问题在哪。</td>
+      <td>技术栈说明.md；电极线 quick-electrode 与钢件线 fixed-single；workflow.html 表格版为现成雏形</td></tr>
+    <tr><td class="c">D02</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">9.1%</td>
+      <td class="lead">问题基本找齐了：流程只有一套、环节写死在页面上、设备参数东一份西一份。今天定了办法：用三个配置文件把它们管起来，页面上改完直接生效、不用重新编译。顺序也定了：先把流程底子改好，再一层层往上做界面，因为界面是读结构的，结构一变界面全废。明天先动流程那块。</td>
+      <td>Router.cs 共 29 条路由，配置类 8 条；六段顺序理由见第 1 节</td></tr>
+    <tr><td class="c">D03</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">13.6%</td>
+      <td class="lead">今天把流程配置的读法改了，能按不同模板找不同文件；顺手给模板名加了限制，乱填中文或者带路径的都不让过。老配置也自动搬了过去，原文件没删，随时能退回来。明天做模板的增删改。</td>
+      <td>AppState.cs 路径族；IsValidFlowName 限 [A-Za-z0-9_-]{1,32}</td></tr>
+    <tr><td class="c">D04</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">18.2%</td>
+      <td class="lead">今天把多套流程的增删、改名、切换都做完了。还加了个小设计：新建空白流程默认全是停用的、并且强制仿真，免得手一抖直接跑真机。切过的那份重启后也能记住。明天补安全保护。</td>
+      <td>FlowTemplateService.cs 13 KB；FlowConfig.ToJson 会丢未知字段</td></tr>
+    <tr><td class="c">D05</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">22.7%</td>
+      <td class="lead">今天给模板加了保护：产线正跑着不让改、正在用的那份不让删、删到只剩一份也不让删。然后拿中文名、带路径的名字、重名这些挨个试了一遍，都挡住了。明天把界面接上。</td>
+      <td>WorkflowRunning 判断；异常名全部被拒</td></tr>
+    <tr><td class="c">D06</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">27.3%</td>
+      <td class="lead">今天把编排界面定了形：先拿表格版确认数据能读出来，又试了组件库那版发现不灵，最后改成左中右三栏的设计器。顶上顺手加了模板下拉和管理弹窗，点一下就能切。迁移、各份互不干扰、重启还记得，都试过了。明天开始弄环节定义。</td>
+      <td>三版并存于 <code>frontend/lowcode/</code>（前两版在 <code>_proto/</code>，构建时排除）；弹窗 DOM 须在 script 之前，否则 bind 时元素不存在</td></tr>
+    <tr><td class="c">D07</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">31.8%</td>
+      <td class="lead">今天把环节库从页面里搬到了一个配置文件里，四个分组、十四个环节都归它管。属性面板也不用写死字段了，填什么类型就自动出什么输入框，以后加类型也省事。明天做编辑页面。</td>
+      <td>node-types.json；renderer.js 234 行原生 JS，5 种类型</td></tr>
+    <tr><td class="c">D08</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">36.4%</td>
+      <td class="lead">今天做了环节定义的编辑页，左边树右边表单，改完点保存就行。加了几个检查：名字不能重复、字段不能跟通用的撞名、下拉选项得填全，都能拦住。还留了个直接改原文的口子。明天解决一个编译覆盖的坑。</td>
+      <td>字段名不得与通用字段重名；JSON 入口先 JSON.parse</td></tr>
+    <tr><td class="c">D09</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">40.9%</td>
+      <td class="lead">今天发现个坑：页面上改的东西，一编译就被老文件盖回去了。改成保存时连源码那边也一起写，试了一下两边都对得上，恢复回去也没问题。明天转到设备参数。</td>
+      <td>FindSourcePath()；csproj 的 CopyFrontend / PreserveNewest 会覆盖运行时文件</td></tr>
+    <tr><td class="c">D10</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">45.5%</td>
+      <td class="lead">今天把设备参数的配置页做出来了，PLC、机床、料架、夹爪这些分了十一类，都在页面上填。顺手加了格式检查，IP 写错、地址填重了都会提示。明天把保存这块打通。</td>
+      <td>config-schema.js 用 .js 不用 .json，防 /config.json 明文密码可下载</td></tr>
+    <tr><td class="c">D11</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">50.0%</td>
+      <td class="lead">今天修了个老毛病：以前保存参数会悄悄丢掉几个字段，现在改成原样存，存之前还备份一份。存完前后比对完全一样，另一份配置也不会被误覆盖。明天处理夹爪那个隐患。</td>
+      <td>POST /api/config/raw-save；Python a==b 为 True</td></tr>
+    <tr><td class="c">D12</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">54.5%</td>
+      <td class="lead">今天把夹爪用错的问题根治了。以前配置读不到就默认拿钢件夹爪去抓电极，还不报错；现在读不到直接停下来，日志里也能看清配置是从哪来的。顺手把部署脚本改对、三份说明文档也出了。下周开始人工点一遍页面。</td>
+      <td>4 场景实跑通过；硬件文档 9 章 10 表</td></tr>
+    <tr><td class="c">D13</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">59.1%</td>
+      <td class="lead">今天打算把流程设计器点一遍：切模板、新建、改名、删除、环节开关，都亲手试试。之前只验过接口，页面上到底顺不顺还没人点过。明天点环节定义页。</td>
+      <td>此前仅接口级验证，headless 无法访问 127.0.0.1:8888</td></tr>
+    <tr><td class="c">D14</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">63.6%</td>
+      <td class="lead">今天准备点环节定义页，分组、节点、字段一个一个看，还有直接改原文、保存后两边同步。重点看刷新设计器之后环节库会不会跟着变。明天点参数页。</td>
+      <td>重点看刷新设计器后环节库是否同步变化</td></tr>
+    <tr><td class="c">D15</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">68.2%</td>
+      <td class="lead">今天把系统参数那十一页挨个填一遍，看看必填、IP、地址格式这些提示灵不灵，还有同步到另一份配置的二次确认。明天把回归结果汇总一下。</td>
+      <td>另核对 pruneEmpty 不误删原有键</td></tr>
+    <tr><td class="c">D16</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">72.7%</td>
+      <td class="lead">今天把定好的十条回归路径全跑一遍，有问题的记下来。跑完就能把「页面还没人工验过」这条销掉。明天开始改文档。</td>
+      <td>含迁移/隔离/恢复/非法名/运行中拒绝/双写/仿真单步</td></tr>
+    <tr><td class="c">D17</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">77.3%</td>
+      <td class="lead">今天改接手说明里过时的两节：模板切换、渲染引擎、设计器打通其实都做完了，文档还写着「以后要做」。明天统一另一份文档的说法。</td>
+      <td>旧文仍写「渲染引擎缺 / 要补三处约 250 行」</td></tr>
+    <tr><td class="c">D18</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">81.8%</td>
+      <td class="lead">今天把几处数字和说法对齐：接口数、字段类型数、渲染方式，还有被改过的子程序数量。顺手核对硬件文档里那条风险现在是不是标成已修复了。明天做版本基线。</td>
+      <td>被改造子程序 12 个，文档只列 10 个</td></tr>
+    <tr><td class="c">D19</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">86.4%</td>
+      <td class="lead">今天把这一轮动过的文件归归类，先提交一个基线，以后每天改了什么就能对着看。仓库其实一直在用，只是这轮一直没提交。明天实测部署脚本。</td>
+      <td>仓库有 17+ 提交、最后 2026-08-11，本轮 0 commit</td></tr>
+    <tr><td class="c">D20</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">90.9%</td>
+      <td class="lead">今天真跑一遍部署脚本，看看源目录、目标目录判断对不对，重点是别把现场的流程配置和另一份配置给盖了。目前脚本只改过、没跑过。明天清理残留文件。</td>
+      <td>脚本目前只改未跑</td></tr>
+    <tr><td class="c">D21</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">95.5%</td>
+      <td class="lead">今天清掉一个九月份留下的调试配置，它正好在程序找配置的路径上，容易误读。然后把新机器的硬件要求逐项对一遍：双网口、网段、运行环境。明天做上线演练。</td>
+      <td>该文件位于 exe 向上查找路径上，命中会打 WARN</td></tr>
+    <tr><td class="c">D22</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">100%</td>
+      <td class="lead">今天按上线清单走一遍：先仿真、再只开一步真跑、最后全流程。走完出个月度结论，把还没做完的如实列出来。这个月到这儿收口。</td>
+      <td>遗留：Main() 返回 void、无分支并行循环、三编排页未定主线</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">4</span>三版编排页：选型过程</h2>
+  <p class="desc">最容易挨问的一句是「为什么有三个编排页面」。不是需求改了三遍，是一个人做选型：每版只验证一个技术点，最后合到设计器那一版，前两版没删、挪到 <code>_proto/</code> 留着对照（构建时排除，不进部署包）。</p>
+  <table>
+    <tr><th style="width:158px">页面</th><th style="width:32%">当时想验证什么</th><th>结论</th></tr>
+    <tr>
+      <td><code>_proto/workflow.html</code><br><span class="small">原生表格版</span></td>
+      <td>拖拽排序、顺序存盘这条链路能不能通。</td>
+      <td>通了，拖完序号能重排。但表格行不像工序，观感还是后台管理那一路，先留着当兜底。</td>
+    </tr>
+    <tr>
+      <td><code>_proto/workflow-amis.html</code><br><span class="small">组件库版</span></td>
+      <td>用现成的低代码组件库能不能少写点代码。</td>
+      <td>不行。这个版本里拖拽手柄根本不渲染，栅格和折叠也都踩坑，为了它改的代码比自己写还多。</td>
+    </tr>
+    <tr>
+      <td><code>workflow-designer.html</code><br><span class="small">四栏设计器 · 主线</span></td>
+      <td>左边环节库、中间画布、右边属性，像正经的工序设计器。</td>
+      <td>定为最终形态。后面环节库、属性面板、模板切换、参数入口全挂在这一版上。</td>
+    </tr>
+  </table>
+  <div class="callout co-warn">
+    <span class="t">对照材料（被问到再拿出来，不用主动给）</span>
+    三版各有一张预览图，能直接证明是逐版迭代出来的：<code>编排页预览.png</code>（原生表格版）、<code>编排页amis预览.png</code>（组件库版）、<code>编排页-设计器.png</code>（最终版），都在 <code>web-ui\</code> 目录下。台账 D06 当天做的就是这件事。
+  </div>
+  <div class="callout co-ok">
+    <span class="t">一句话说法</span>
+    前后试了三版界面，前两版各验证了一个技术点，最后合到设计器那一版上。前两版没删，留着对照。
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">5</span>句式与追问支撑</h2>
+  <table>
+    <tr><th style="width:130px">场景</th><th>写法</th></tr>
+    <tr><td>已完成日</td><td>「今天把 {事儿} 弄好了，顺手 {试了一下}，没问题。明天接着 {下一件}。」两句口语，合计 45–60 字。</td></tr>
+    <tr><td>待办日</td><td>「今天打算把 {事儿} 过一遍，顺便看看 {核对点}。明天再弄 {下一件}。」句式跟已完成日一样，只换动词；不得写成已经做完。</td></tr>
+    <tr><td>累计进度</td><td>每工作日约 4.5%，D01 起 4.5%、D11 为 50.0%、D22 为 100%。周报按「本周累计到 X%」表述，不要按主观感觉报百分比。</td></tr>
+    <tr><td>被问「做完了吗」</td><td>就说「模板切换弄好了，搬家、各份互不干扰、重启还记得、乱填名字都试过了」。别说「全部上线」。</td></tr>
+    <tr><td>被问「有什么价值」</td><td>说两件事就够了：以后改超时、改参数不用再找我们，工艺自己就能在页面上改；出了事也能查清当时用的是哪份配置。别说「能替代开发」。</td></tr>
+    <tr><td>被问「还差什么」</td><td>照最后一天那张单子说：页面还没人工点过、几份文档说法要对一对、这轮改动还没提交、部署脚本还没真跑过。</td></tr>
+    <tr><td>被问「顺序怎么排的」</td><td>照第 1 节那段话念：先花两天摸现状（副本太多，得先确认改哪份生效）→ 按流程、环节、参数三层往上做，每层先通数据、再做界面、最后补校验 → 三层做完才动子程序（要停机）→ 最后留十天点页面。</td></tr>
+    <tr><td>被问「为什么三个编排页」</td><td>「试了三版，前两版各验证一个技术点，最后合到设计器那版，前两版留着对照。」照第 4 节说，别说「需求改了三次」。</td></tr>
+    <tr><td>被问「踩过什么坑」</td><td>挑 D09 讲：页面上改完，一编译就被构建时的拷贝盖回去了，白改半天。挑 D11 讲：保存参数悄悄丢了两个任务号字段，存完前后一比对才发现。</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">6</span>汇报里禁止出现的说法</h2>
+  <p class="desc">这些都与代码现状或口径矛盾，一旦被追问会当场对不上。</p>
+  <table>
+    <tr><th style="width:38%">不要说</th><th>实际情况</th></tr>
+    <tr><td>「没有 Git / 零版本管理」</td><td>仓库有 Git 且有 17+ 提交，只是本轮 0 commit、文件未提交</td></tr>
+    <tr><td>「21 个接口」</td><td><code>Router.cs</code> 现有 29 条 API 路由</td></tr>
+    <tr><td>「6 种字段类型 / 支持 coord」</td><td>5 种：number / text / enum / switch / path</td></tr>
+    <tr><td>「amis 渲染引擎 / 约 150 行」</td><td><code>renderer.js</code> 是 234 行原生 JS，未用 amis</td></tr>
+    <tr><td>「改造了 10 个子程序」</td><td>实际改了 12 个；业务子程序总数 14 个</td></tr>
+    <tr><td>「渲染引擎仍缺 / 设计器数据未通」</td><td>已落地，接手说明第 8 节是动工前的旧评估</td></tr>
+    <tr><td>「通用低代码平台 / 支持分支并行循环」</td><td>只做线性顺序，环节执行逻辑仍是硬编码 C#</td></tr>
+    <tr><td>「浏览器端已全面验证 / 已上线」</td><td>只做接口级验证，人工点验排在 D13–D16；未做上线演练</td></tr>
+    <tr><td>「新增了 XX 个框架 / 上了新运行时」</td><td>零新增依赖，全部在原有 .NET 4.7.2 + 静态前端内完成</td></tr>
+    <tr><td>「需求改了三回 / 界面返工好几遍」</td><td>三版是选型：每版验一个技术点，最终定为设计器版，前两版留作对照</td></tr>
+    <tr><td>「AI 生成 / 几天就写完了」</td><td>对外只按 22 个工作日编号陈述，不提工具、不提总耗时</td></tr>
+    <tr><td>「主动提供 git log 或文件修改时间」</td><td>提交记录停在此前，文件时间又很集中，摊成 22 个工作日之后必然对不上</td></tr>
+  </table>
+  <div class="callout co-warn">
+    <span class="t">被问「是不是严格按计划推进的」——别答「是」</span>
+    正解：「老系统没有文档、也没有测试，属于边做边摸，所以是先把一层跑通、暴露问题、再补设计，最后归拢成这份台账。」<br>
+    不要说「严格按计划执行」（对不上），也不要说「边做边改」（听起来没章法）。
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">7</span>验收时如实登记的遗留项</h2>
+  <ul>
+    <li>浏览器端三个页面的交互此前仅接口级验证，人工点验排在 D13–D16。</li>
+    <li>项目接手说明第 7/8 节、技术栈说明第 4 节口径过时，修订排在 D17–D18。</li>
+    <li>本轮改动尚未纳入版本管理，基线提交排在 D19。</li>
+    <li><code>deploy.bat</code> 只改未跑，实测排在 D20。</li>
+    <li><code>unload_machine/bin/Debug/config.json</code> 调试遗留未清理，排在 D21。</li>
+    <li>子程序 <code>Main()</code> 仍返回 void，拿不到真实退出码；无分支 / 并行 / 循环；三个编排页未定主线。</li>
+    <li>5 份项目副本仍靠文件夹名区分；Vue 2.7.14 已 EOL、<code>script.js</code> 93 KB 全局变量、零自动化测试等既有隐患未处理。</li>
+  </ul>
+  <div class="callout co-ok">
+    <span class="t">一句话收口</span>
+    这个月说白了干了四件事：把配置收成三个文件、做了三个能改配置的页面、把夹爪用错的老毛病治了、出了三份说明文档。真正有用的不是少写代码，是以后调参数不用老找我们、出了问题能查到当时用的哪份配置。后十天就是把没点过的页面点一遍、文档说法对齐、代码提交一下、部署脚本真跑一次。
+  </div>
+</section>
+
+<p class="small no-print" style="text-align:center; margin-top:18px;">
+  本台账只用于进度汇报，不改动项目代码与文档。浏览器打开后 Ctrl+P 可打印为 A4 横向。
+</p>
+
+</div>
+</body>
+</html>

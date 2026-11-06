@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工序编排 - MachineMonitor</title>
+<link rel="stylesheet" href="../../lib/amis/sdk.css">
+<link rel="stylesheet" href="../../lib/amis/iconfont.css">
+<style>
+  /* 设计规范对齐 JNPF：Vue3 + Ant Design Vue 5 默认 token */
+  :root{
+    --line:#f0f0f0; --line-2:#d9d9d9;
+    --text:rgba(0,0,0,.88); --text-2:rgba(0,0,0,.65); --text-3:rgba(0,0,0,.45);
+    --blue:#1677ff; --blue-bg:#e6f4ff;
+    --green:#52c41a; --green-bg:#f6ffed;
+    --red:#ff4d4f; --red-bg:#fff2f0;
+    --amber:#faad14; --amber-bg:#fffbe6;
+    --side:260px;
+    --radius:8px; --radius-sm:6px;
+    --shadow:0 1px 2px 0 rgba(0,0,0,.03), 0 1px 6px -1px rgba(0,0,0,.02), 0 2px 4px 0 rgba(0,0,0,.02);
+    --shadow-hover:0 3px 6px -4px rgba(0,0,0,.12), 0 6px 16px 0 rgba(0,0,0,.08), 0 9px 28px 8px rgba(0,0,0,.05);
+  }
+  html, body{
+    margin:0; padding:0; background:#f5f5f5;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;
+  }
+
+  /* ---------- 状态条（AntD Alert 观感） ---------- */
+  .wf-bar{
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:9px 14px; font-size:14px; color:var(--text);
+  }
+  .wf-dot{width:8px; height:8px; border-radius:50%; background:var(--text-3); display:inline-block;}
+  .wf-dot.on{background:var(--green); box-shadow:0 0 0 3px var(--green-bg);}
+  .wf-dot.warn{background:var(--amber); box-shadow:0 0 0 3px var(--amber-bg);}
+  .wf-bar .meta{color:var(--text-3); font-size:13px;}
+
+  /* ---------- 两栏布局：交给 amis 的 grid 组件，这里只做微调 ---------- */
+  .wf-page .cxd-Page-main,
+  .wf-page .cxd-Page-body{ max-width:none !important; width:100% !important; }
+
+  .wf-grid .cxd-Grid-col{ min-width:0 !important; }
+  .wf-side .cxd-Container,
+  .wf-main .cxd-Container{ min-width:0; }
+
+  /* ---------- 侧栏卡片 ---------- */
+  .wf-card{
+    background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:14px 16px; margin-bottom:12px;
+  }
+  .wf-sec{
+    font-size:14px; font-weight:600; color:var(--text);
+    margin-bottom:10px; display:flex; align-items:center; gap:6px;
+    overflow:hidden;
+  }
+  .wf-sec .cnt{
+    font-weight:400; color:var(--text-3); font-size:12px;
+    background:#f5f5f5; border-radius:10px; padding:0 7px; line-height:18px;
+  }
+  .wf-sec .hint{font-weight:400; color:var(--text-3); font-size:12px; margin-left:8px; white-space:nowrap;}
+
+  .wf-side .cxd-Form-item{ margin-bottom:12px !important; }
+  .wf-side .cxd-Form-label{ font-size:13px; color:var(--text-2); padding-bottom:4px !important; }
+
+  /* ---------- 可用环节 ---------- */
+  .wf-pool-item{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:7px 10px; margin-bottom:6px; background:#fff;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .wf-pool-item:hover{ border-color:var(--blue); box-shadow:0 0 0 2px rgba(22,119,255,.06); }
+  .wf-pool-meta{ min-width:0; flex:1 1 auto; }
+  .wf-pool-item .wf-add{
+    flex:0 0 auto; border:none; background:transparent; cursor:pointer;
+    color:var(--blue); font-size:13px; padding:1px 6px; border-radius:4px; line-height:20px;
+    transition:background .2s;
+  }
+  .wf-pool-item .wf-add:hover{ background:var(--blue-bg); }
+  .wf-pool-name{ font-size:13px; color:var(--text); line-height:1.4; }
+  .wf-pool-code{ font-size:12px; color:var(--text-3); font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+  .wf-pool-empty{ font-size:13px; color:var(--text-3); padding:12px 2px; text-align:center; }
+
+  /* ---------- 操作按钮 ---------- */
+  .wf-actions .cxd-Button{ width:100%; margin-bottom:8px; height:32px !important; border-radius:var(--radius-sm) !important; }
+  .wf-actions .cxd-Button:last-child{ margin-bottom:0; }
+
+  /* amis 控件向 AntD 靠拢 */
+  .wf-side .cxd-Button,
+  .wf-main .cxd-Button{
+    border-radius:var(--radius-sm) !important;
+    box-shadow:none !important;
+  }
+  .wf-side .cxd-Button--primary{
+    background:var(--blue) !important; border-color:var(--blue) !important;
+  }
+  .wf-side .cxd-Button--primary:hover{
+    background:var(--primary-hover,#4096ff) !important; border-color:#4096ff !important;
+  }
+  .wf-side .cxd-Button--danger{
+    background:#fff !important; border:1px solid var(--red) !important; color:var(--red) !important;
+  }
+  .wf-side .cxd-Button--danger:hover{
+    background:var(--red-bg) !important; border-color:var(--red) !important; color:var(--red) !important;
+  }
+  .wf-side .cxd-Input,
+  .wf-side .cxd-Select,
+  .wf-side .cxd-NumberInput input{
+    border-radius:var(--radius-sm) !important;
+    border-color:var(--line-2) !important;
+  }
+
+  /* ---------- 卡片流：极简卡片，点开才出参数 ---------- */
+  /* 列（关闭 showIndex 后共 8 列）：
+     1 环节名 | 2 标识(隐藏) | 3 超时 | 4 失败策略 | 5 仿真 | 6 模拟失败 | 7 状态 | 8 ✕ */
+  .wf-main .cxd-Table,
+  .wf-main .cxd-Table-content,
+  .wf-main .cxd-Table-table,
+  .wf-main .cxd-Table-table > tbody{ display:block !important; width:100% !important; }
+  .wf-main .cxd-Table-table > thead{ display:none !important; }
+
+  .wf-main .cxd-Table-table > tbody{ counter-reset:wfstep; }
+  .wf-main .cxd-Table-table > tbody > tr{
+    display:flex !important; align-items:center; gap:10px;
+    width:100% !important; box-sizing:border-box;
+    border:1px solid var(--line) !important; border-radius:var(--radius);
+    background:#fff; box-shadow:var(--shadow);
+    padding:8px 14px !important; margin-bottom:6px;
+    cursor:pointer; counter-increment:wfstep;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  /* 序号：CSS 计数器生成的圆形徽标，不依赖 amis 的 index 列 */
+  .wf-main .cxd-Table-table > tbody > tr::before{
+    content:counter(wfstep);
+    flex:0 0 24px; width:24px; height:24px; border-radius:50%;
+    background:var(--blue-bg); color:var(--blue);
+    font-size:12px; font-weight:500; line-height:24px; text-align:center;
+    user-select:none;
+  }
+  .wf-main .cxd-Table-table > tbody > tr:hover{
+    border-color:#91caff !important;
+    box-shadow:0 2px 8px rgba(0,0,0,.09);
+  }
+  .wf-main .cxd-Table-table > tbody > tr > td{
+    border:none !important; padding:0 !important; display:block !important;
+    background:transparent !important; height:auto !important;
+  }
+
+  /* 折叠态：参数四列（3~6）收起来 */
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(2),
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(3),
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(4),
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(5),
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(6){ display:none !important; }
+
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(1){ flex:1 1 auto; min-width:0; }
+  /* 状态做成 AntD Tag 观感 */
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(7){
+    flex:0 0 auto; display:flex; justify-content:flex-end;
+  }
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(7) input{
+    border:none !important; background:#fafafa !important;
+    border-radius:4px !important; padding:1px 8px !important;
+    width:56px !important; text-align:center !important;
+    font-size:12px !important; color:var(--text-2) !important; line-height:18px !important;
+  }
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(8){ flex:0 0 22px; text-align:right; }
+
+  /* 名称：平时几乎像纯文本（amis 的 text 外面可能还套一层，一起去掉边框） */
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(1) input,
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(1) .cxd-Input,
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(1) .cxd-TextControl{
+    font-size:14px !important; font-weight:500 !important; color:var(--text) !important;
+    border:0 !important; box-shadow:none !important; background:transparent !important;
+    padding:2px 4px !important; height:26px !important; width:100% !important; box-sizing:border-box;
+  }
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(1) input:focus{
+    background:#fff !important; box-shadow:0 0 0 1px var(--blue) !important; border-radius:4px !important;
+  }
+
+  /* 名称 / 状态列内部的一切都不要边框，看起来才是纯文本 */
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(1) *,
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(7) *{
+    border:0 !important; box-shadow:none !important; background:transparent !important;
+  }
+
+  /* ✕ 删除按钮 */
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(8) button{
+    padding:0 !important; height:auto !important; min-width:0 !important;
+    border:none !important; background:transparent !important;
+    color:var(--text-3) !important; font-size:14px !important; line-height:1;
+    transition:color .2s;
+  }
+  .wf-main .cxd-Table-table > tbody > tr > td:nth-child(8) button:hover{ color:var(--red) !important; }
+
+  /* 页头 */
+  .wf-page .cxd-Page-title{ font-size:18px !important; font-weight:600 !important; color:var(--text) !important; }
+  .wf-page .cxd-Page-subTitle{ font-size:13px !important; color:var(--text-3) !important; margin-top:4px !important; }
+
+  /* ---------- 展开态：第一行照旧，参数落到第二行 ---------- */
+  /* 8 列：序号 | 4×参数宽 | 余量 | 状态 | ✕
+     名称跨 2~6 列，参数在第二行从第 2 列起，和名称左对齐 */
+  .wf-main .cxd-Table-table > tbody > tr.is-open{
+    display:grid !important;
+    grid-template-columns:24px 112px 112px 112px 112px minmax(0,1fr) 64px 22px;
+    column-gap:10px; row-gap:12px; align-items:center;
+    border-color:#91caff !important; background:#fff;
+    box-shadow:0 2px 8px rgba(22,119,255,.10);
+  }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(3),
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(4),
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(5),
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(6){ display:block !important; }
+
+  /* 第一行 */
+  .wf-main .cxd-Table-table > tbody > tr.is-open::before{ grid-area:1/1/2/2; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(1){ grid-area:1/2/2/7; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(7){ grid-area:1/7/2/8; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(8){ grid-area:1/8/2/9; justify-self:end; }
+
+  /* 第二行：四个参数等宽，与名称左对齐 */
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(3){ grid-area:2/2/3/3; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(4){ grid-area:2/3/3/4; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(5){ grid-area:2/4/3/5; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(6){ grid-area:2/5/3/6; }
+
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(3)::before,
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(4)::before,
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(5)::before,
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(6)::before{
+    display:block; font-size:11px; color:var(--text-3); margin-bottom:3px;
+  }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(3)::before{ content:'超时(s)'; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(4)::before{ content:'失败策略'; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(5)::before{ content:'仿真(ms)'; }
+  .wf-main .cxd-Table-table > tbody > tr.is-open > td:nth-child(6)::before{ content:'模拟失败'; }
+
+  .wf-main .cxd-Table-table > tbody > tr > td input[type=number],
+  .wf-main .cxd-Table-table > tbody > tr > td select{
+    font-size:12px !important; height:28px !important; padding:2px 6px !important;
+    width:100% !important; box-sizing:border-box;
+  }
+  .wf-main .cxd-Table-table > tbody > tr.wf-ghost{ opacity:.4; background:var(--blue-bg) !important; }
+
+  /* ---------- 窄屏：左栏折到上面 ---------- */
+  @media (max-width: 1100px){
+    .wf-grid .cxd-Grid-col{ flex:0 0 100% !important; max-width:100% !important; }
+    .wf-side{ margin-bottom:12px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="../../lib/amis/sdk.js"></script>
+<script src="../../lib/sortable.min.js"></script>
+<script>
+(function () {
+
+  var schema = {
+    type: 'page',
+    className: 'wf-page',
+    title: '工序编排',
+    subTitle: '拖动卡片调整顺序 · 点卡片展开参数 · ✕ 移回左侧池子 · 左侧「加入」加回流程',
+    body: [
+      {
+        type: 'service',
+        id: 'statusSvc',
+        api: 'get:/api/workflow/status',
+        interval: 2000,
+        silentPolling: true,
+        body: {
+          type: 'tpl',
+          tpl: '<div class="wf-bar">' +
+               '<span class="wf-dot ${running ? (paused ? "warn" : "on") : ""}"></span>' +
+               '<span>${running ? (paused ? "已暂停" : "运行中") : "未运行"}</span>' +
+               '<span class="meta">${mode === "loop" ? "轮播（失败即停）" : "单次执行"} · ${simulate ? "仿真模式，不连设备" : "真实执行"}</span>' +
+               '</div>'
+        }
+      },
+      {
+        type: 'form',
+        id: 'flowForm',
+        initApi: 'get:/api/workflow/plan',
+        api: 'post:/api/workflow/plan/save',
+        wrapWithPanel: false,
+        labelAlign: 'top',
+        body: [
+          {
+            type: 'grid',
+            className: 'wf-grid',
+            gap: 'md',
+            columns: [
+              {
+                xs: 24,
+                md: 3,
+                body: [
+                  {
+                    type: 'container',
+                    className: 'wf-side',
+                    body: [
+                  {
+                    type: 'container',
+                    className: 'wf-card',
+                    body: [
+                      { type: 'tpl', tpl: '<div class="wf-sec">执行参数</div>' },
+                      {
+                        type: 'radios',
+                        name: 'mode',
+                        label: '模式',
+                        inline: true,
+                        options: [
+                          { label: '单次', value: 'once' },
+                          { label: '轮播', value: 'loop' }
+                        ]
+                      },
+                      {
+                        type: 'switch',
+                        name: 'simulate',
+                        label: '仿真模式',
+                        onText: '开',
+                        offText: '关'
+                      },
+                      {
+                        type: 'input-number',
+                        name: 'loopIntervalMs',
+                        label: '轮播间隔(ms)',
+                        min: 100,
+                        step: 100
+                      }
+                    ]
+                  },
+                  {
+                    type: 'container',
+                    className: 'wf-card',
+                    body: [
+                      {
+                        type: 'tpl',
+                        tpl: '<div class="wf-sec"><span>可用环节</span><span class="cnt" id="poolCount">0</span></div>' +
+                             '<div id="poolHost" class="wf-pool"><div class="wf-pool-empty">加载中…</div></div>'
+                      }
+                    ]
+                  },
+                  {
+                    type: 'container',
+                    className: 'wf-card wf-actions',
+                    body: [
+                      { type: 'tpl', tpl: '<div class="wf-sec">操作</div>' },
+                      {
+                        type: 'button',
+                        label: '保存并启动',
+                        level: 'primary',
+                        block: true,
+                        actionType: 'ajax',
+                        api: 'post:/api/workflow/plan/start',
+                        data: {
+                          mode: '${mode}',
+                          simulate: '${simulate}',
+                          loopIntervalMs: '${loopIntervalMs}',
+                          steps: '${steps}'
+                        },
+                        reload: 'statusSvc'
+                      },
+                      {
+                        type: 'submit',
+                        label: '仅保存编排',
+                        level: 'default',
+                        block: true
+                      },
+                      {
+                        type: 'button',
+                        label: '停止运行',
+                        level: 'danger',
+                        block: true,
+                        actionType: 'ajax',
+                        api: 'post:/api/workflow/stop',
+                        reload: 'statusSvc'
+                      }
+                    ]
+                  }
+                    ]
+                  }
+                ]
+              },
+              {
+                xs: 24,
+                md: 9,
+                body: [
+                  {
+                    type: 'container',
+                    className: 'wf-main',
+                body: [
+                  {
+                    type: 'tpl',
+                    tpl: '<div class="wf-sec"><span>执行流程</span><span class="cnt">${steps ? steps.length : 0}</span><span class="hint">从上到下依次执行</span></div>'
+                  },
+                  {
+                    type: 'input-table',
+                    id: 'flowTable',
+                    name: 'steps',
+                    needConfirm: false,
+                    addable: false,
+                    removable: true,
+                    removableMode: 'button',
+                    deleteBtnLabel: '✕',
+                    deleteBtnIcon: '',
+                    showTableAddBtn: false,
+                    showFooterAddBtn: false,
+                    columnsTogglable: false,
+                    columns: [
+                      { name: 'display', label: '环节', type: 'text', readOnly: true },
+                      { name: 'name', label: '标识', type: 'text', readOnly: true },
+                      { name: 'timeoutSec', label: '超时(s)', type: 'input-number', min: 1, max: 7200 },
+                      {
+                        name: 'onFail',
+                        label: '失败策略',
+                        type: 'select',
+                        options: [
+                          { label: '停在当前步', value: 'stop' },
+                          { label: '跳过继续', value: 'skip' }
+                        ]
+                      },
+                      { name: 'simMs', label: '仿真(ms)', type: 'input-number', min: 100, step: 100 },
+                      { name: 'simFail', label: '模拟失败', type: 'switch' },
+                      { name: 'statusText', label: '状态', type: 'text', readOnly: true }
+                    ]
+                  }
+                ]
+              }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+
+  var amisEmbed = amisRequire('amis/embed');
+  var scoped = amisEmbed.embed('#root', schema, {
+    name: 'flow-editor'
+  }, {
+    theme: 'cxd',
+    isCancelOut: true
+  });
+
+  window.__wfScoped = scoped;
+
+  // ==================== 表单读写 ====================
+  function getForm() {
+    return scoped && scoped.getComponentById ? scoped.getComponentById('flowForm') : null;
+  }
+
+  function getSteps() {
+    var f = getForm();
+    if (!f || typeof f.getValues !== 'function') return null;
+    var v = f.getValues() || {};
+    return v.steps || [];
+  }
+
+  function setSteps(steps) {
+    var f = getForm();
+    if (!f || typeof f.setValues !== 'function') return;
+    var v = f.getValues() || {};
+    v.steps = steps;
+    f.setValues(v);
+  }
+
+  // 两栏布局交给 amis 的 grid 组件（schema 里的 type: 'grid'），这里不再做 DOM 干预。
+
+  // ==================== 可用环节池子（原生渲染） ====================
+  var POOL = [];
+  var ALL = {};
+  var poolVer = 0;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function renderPool() {
+    var host = document.getElementById('poolHost');
+    var cnt = document.getElementById('poolCount');
+    if (cnt) cnt.textContent = POOL.length;
+    if (!host) return;
+    host.setAttribute('data-v', String(poolVer));
+    if (!POOL.length) {
+      host.innerHTML = '<div class="wf-pool-empty">池子已空，所有环节都在流程中</div>';
+      return;
+    }
+    host.innerHTML = POOL.map(function (a) {
+      return '<div class="wf-pool-item">' +
+               '<div class="wf-pool-meta">' +
+                 '<div class="wf-pool-name">' + esc(a.display) + '</div>' +
+                 '<div class="wf-pool-code">' + esc(a.name) + '</div>' +
+               '</div>' +
+               '<button type="button" class="wf-add" data-name="' + esc(a.name) + '">加入</button>' +
+             '</div>';
+    }).join('');
+  }
+
+  function ensurePool() {
+    var host = document.getElementById('poolHost');
+    if (!host) return;
+    if (host.getAttribute('data-v') !== String(poolVer)) renderPool();
+  }
+
+  function loadPool() {
+    fetch('/api/workflow/plan', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.success) return;
+        POOL = (j.available || []).slice();
+        ALL = {};
+        (j.steps || []).concat(j.available || []).forEach(function (s) { ALL[s.name] = s; });
+        poolVer++;
+        ensurePool();
+      })
+      .catch(function () {});
+  }
+
+  function addToFlow(name) {
+    if (!name) return;
+    var steps = getSteps();
+    if (!steps) return;
+    if (steps.some(function (s) { return s.name === name; })) return;
+
+    var item = null;
+    for (var i = 0; i < POOL.length; i++) {
+      if (POOL[i].name === name) { item = POOL[i]; break; }
+    }
+    if (!item) return;
+
+    steps.push({
+      name: item.name,
+      display: item.display,
+      enabled: true,
+      timeoutSec: item.timeoutSec,
+      onFail: item.onFail,
+      simMs: item.simMs,
+      simFail: item.simFail,
+      statusText: '待执行'
+    });
+
+    POOL = POOL.filter(function (a) { return a.name !== name; });
+    poolVer++;
+    renderPool();
+    setSteps(steps);
+  }
+
+  function backToPool(name) {
+    if (!name) return;
+    var steps = getSteps();
+    if (!steps) return;
+    if (steps.some(function (s) { return s.name === name; })) return;
+    if (POOL.some(function (a) { return a.name === name; })) return;
+    var src = ALL[name];
+    if (!src) return;
+    POOL.push({
+      name: src.name, display: src.display, enabled: false,
+      timeoutSec: src.timeoutSec, onFail: src.onFail,
+      simMs: src.simMs, simFail: src.simFail
+    });
+    poolVer++;
+    renderPool();
+  }
+
+  // 池子里「加入」：事件委托，避免 amis action 表达式求值踩坑
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains('wf-add')) return;
+    addToFlow(t.getAttribute('data-name'));
+  });
+
+  // 表格里点 ✕ 删行后，把该环节放回池子（行已从 DOM 移除才回池）
+  function attachRowWatch() {
+    var tbody = findTbody();
+    if (!tbody || tbody.getAttribute('data-rowwatch') === '1') return;
+    tbody.setAttribute('data-rowwatch', '1');
+    tbody.addEventListener('click', function (e) {
+      var tr = e.target && e.target.closest ? e.target.closest('tr') : null;
+      if (!tr) return;
+      var inputs = tr.querySelectorAll('input');
+      if (inputs.length < 2) return;
+      var name = inputs[1].value;
+      setTimeout(function () {
+        if (!document.body.contains(tr)) backToPool(name);
+      }, 220);
+    }, true);
+  }
+
+  // 点卡片展开/收起参数行（点控件本身不触发）
+  var lastDragAt = 0;
+  function attachExpand() {
+    var tbody = findTbody();
+    if (!tbody || tbody.getAttribute('data-expand') === '1') return;
+    tbody.setAttribute('data-expand', '1');
+    tbody.addEventListener('click', function (e) {
+      if (Date.now() - lastDragAt < 350) return;
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('input,select,textarea,button,a')) return;
+      var tr = t.closest('tr');
+      if (!tr) return;
+      tr.classList.toggle('is-open');
+    });
+  }
+
+  // ==================== 拖拽排序（SortableJS） ====================
+  function findTbody() {
+    var root = document.getElementById('root');
+    if (!root) return null;
+    var bodies = root.querySelectorAll('table > tbody');
+    for (var i = 0; i < bodies.length; i++) {
+      if (bodies[i].querySelector('tr input')) return bodies[i];
+    }
+    return null;
+  }
+
+  function attachSortable() {
+    var tbody = findTbody();
+    if (!tbody || tbody.getAttribute('data-sorted') === '1') return;
+    tbody.setAttribute('data-sorted', '1');
+
+    Sortable.create(tbody, {
+      animation: 150,
+      filter: 'input,select,button,a,i',
+      preventOnFilter: false,
+      ghostClass: 'wf-ghost',
+      onEnd: function () { lastDragAt = Date.now(); onReorder(); }
+    });
+  }
+
+  function onReorder() {
+    var tbody = findTbody();
+    var form = getForm();
+    if (!tbody || !form || typeof form.getValues !== 'function') return;
+
+    var vals = form.getValues() || {};
+    var steps = vals.steps || [];
+    if (!steps.length) return;
+
+    var byName = {};
+    steps.forEach(function (s) { byName[s.name] = s; });
+
+    var ordered = [];
+    Array.prototype.forEach.call(tbody.querySelectorAll('tr'), function (tr) {
+      var inputs = tr.querySelectorAll('input');
+      if (inputs.length < 2) return;
+      var name = inputs[1].value;
+      if (byName[name]) {
+        ordered.push(byName[name]);
+        delete byName[name];
+      }
+    });
+
+    Object.keys(byName).forEach(function (k) { ordered.push(byName[k]); });
+    if (ordered.length !== steps.length) return;
+
+    if (typeof form.setValues === 'function') {
+      vals.steps = ordered;
+      form.setValues(vals);
+    }
+  }
+
+  // ==================== 启动 ====================
+  function sync() {
+    attachSortable();
+    attachRowWatch();
+    attachExpand();
+    ensurePool();
+  }
+
+  var mountTimer = null;
+  var observer = new MutationObserver(function () {
+    clearTimeout(mountTimer);
+    mountTimer = setTimeout(sync, 160);
+  });
+
+  function startWatch() {
+    var root = document.getElementById('root');
+    if (!root) return;
+    observer.observe(root, { childList: true, subtree: true });
+    sync();
+    loadPool();
+  }
+
+  if (document.readyState === 'complete') setTimeout(startWatch, 500);
+  else window.addEventListener('load', function () { setTimeout(startWatch, 500); });
+})();
+</script>
+</body>
+</html>

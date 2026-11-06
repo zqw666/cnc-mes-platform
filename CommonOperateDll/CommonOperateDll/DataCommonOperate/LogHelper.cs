@@ -162,6 +162,27 @@ namespace DataCommonOperate
             catch { }
         }
 
+        /// <summary>
+        /// 通知主控程序：料位状态/工件状态已变化，主控程序将向前端推送更新
+        /// 子程序在更新 rack_administrate 等料位数据后调用
+        /// </summary>
+        public static void NotifyRackChanged()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(ApiBase)) return;
+                var req = WebRequest.CreateHttp(ApiBase + "/api/rack/notify");
+                req.Method = "POST";
+                req.ContentType = "application/json";
+                req.Timeout = 3000;
+                var bytes = Encoding.UTF8.GetBytes("{}");
+                using (var rs = req.GetRequestStream())
+                    rs.Write(bytes, 0, bytes.Length);
+                try { req.GetResponse().Close(); } catch { }
+            }
+            catch { }
+        }
+
         /// <summary>简单 JSON 序列化（避免依赖 System.Web.Extensions）</summary>
         static string JsonSerialize(object obj)
         {

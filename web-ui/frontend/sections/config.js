@@ -9,10 +9,6 @@
       // 线体配置
       const line = d.line || {};
       const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-      setVal('cfg-rack-type', line.rackType || '固定料架');
-      setVal('cfg-rack-count', line.rackCount || '');
-      setVal('cfg-rack-layers', line.rackLayers || '');
-      setVal('cfg-rack-slots', line.rackSlots || '');
       setVal('cfg-gripper-type', line.gripperType || '固定单爪');
       setVal('cfg-grab-mode', line.grabMode || 'A抓B放');
       setVal('cfg-pallet-enabled', line.palletEnabled ? 'yes' : 'no');
@@ -117,10 +113,15 @@ function renderMachines() {
       html += '<div class="config-field"><label>通讯端口</label><input class="config-input mc-port" value="' + escapeHtml(m.port || '') + '" placeholder="如: 8193" /></div>';
       html += '<div class="config-field"><label>工位数</label><input class="config-input mc-station" type="number" value="' + (m.stationCount || 4) + '" min="1" /></div>';
       html += '<div class="config-field"><label>NC路径</label><input class="config-input mc-nc" value="' + escapeHtml(m.ncPath || '') + '" placeholder="如: C:\\NC\\Mac1" /></div>';
+      html += '<div class="config-field"><label>抓取开始任务号</label><input class="config-input mc-grab-task" value="' + escapeHtml(m.grabStartTaskNo || '') + '" placeholder="如: 201" /></div>';
+      html += '<div class="config-field"><label>放置开始任务号</label><input class="config-input mc-place-task" value="' + escapeHtml(m.placeStartTaskNo || '') + '" placeholder="如: 202" /></div>';
+      html += '<div class="config-field"><label>托盘工位编号</label><input class="config-input mc-pallet-worknum" type="number" value="' + (m.palletWorkNum || 1) + '" min="1" placeholder="托盘料架放置工位" /></div>';
+      html += '<div class="config-field"><label>工位坐标系编号</label><input class="config-input mc-work-coords" value="' + escapeHtml(m.workCoords || '') + '" placeholder="如: G54,G55,G56,G57" /></div>';
       if (isSiemens) {
         html += '<div class="config-field"><label>会话URL</label><input class="config-input mc-session-url" value="' + escapeHtml(m.sessionUrl || '') + '" placeholder="如: opc.tcp://192.168.1.1:4840" /></div>';
         html += '<div class="config-field"><label>登录用户名</label><input class="config-input mc-username" value="' + escapeHtml(m.username || '') + '" placeholder="OPC UA 用户名" /></div>';
         html += '<div class="config-field"><label>登录密码</label><input class="config-input mc-password" type="password" value="' + escapeHtml(m.password || '') + '" placeholder="OPC UA 密码" /></div>';
+        html += '<div class="config-field"><label>HostKey</label><input class="config-input mc-host-key" value="' + escapeHtml(m.hostKey || '') + '" placeholder="如: C:\\keys\\host.pem" /></div>';
       }
       html += '<button class="btn-remove-machine" title="删除机床">✕</button>';
       card.innerHTML = html;
@@ -130,10 +131,15 @@ function renderMachines() {
       card.querySelector('.mc-port').addEventListener('input', e => { machinesConfig[i].port = e.target.value; persistLineConfig(); });
       card.querySelector('.mc-station').addEventListener('input', e => { machinesConfig[i].stationCount = parseInt(e.target.value) || 4; persistLineConfig(); });
       card.querySelector('.mc-nc').addEventListener('input', e => { machinesConfig[i].ncPath = e.target.value; persistLineConfig(); });
+      card.querySelector('.mc-grab-task').addEventListener('input', e => { machinesConfig[i].grabStartTaskNo = e.target.value; persistLineConfig(); });
+      card.querySelector('.mc-place-task').addEventListener('input', e => { machinesConfig[i].placeStartTaskNo = e.target.value; persistLineConfig(); });
+      card.querySelector('.mc-pallet-worknum').addEventListener('input', e => { machinesConfig[i].palletWorkNum = e.target.value; persistLineConfig(); });
+      card.querySelector('.mc-work-coords').addEventListener('input', e => { machinesConfig[i].workCoords = e.target.value; persistLineConfig(); });
       if (isSiemens) {
         card.querySelector('.mc-session-url').addEventListener('input', e => { machinesConfig[i].sessionUrl = e.target.value; persistLineConfig(); });
         card.querySelector('.mc-username').addEventListener('input', e => { machinesConfig[i].username = e.target.value; persistLineConfig(); });
         card.querySelector('.mc-password').addEventListener('input', e => { machinesConfig[i].password = e.target.value; persistLineConfig(); });
+        card.querySelector('.mc-host-key').addEventListener('input', e => { machinesConfig[i].hostKey = e.target.value; persistLineConfig(); });
       }
       card.querySelector('.btn-remove-machine').addEventListener('click', () => {
         machinesConfig.splice(i, 1);
@@ -147,10 +153,6 @@ function renderMachines() {
   function collectConfig() {
     return {
       line: {
-        rackType: document.getElementById('cfg-rack-type').value,
-        rackCount: document.getElementById('cfg-rack-count').value,
-        rackLayers: document.getElementById('cfg-rack-layers').value,
-        rackSlots: document.getElementById('cfg-rack-slots').value,
         gripperType: document.getElementById('cfg-gripper-type').value,
         grabMode: document.getElementById('cfg-grab-mode').value,
         shuttleExists: document.getElementById('cfg-shuttle-exists').value,
@@ -236,18 +238,14 @@ function renderMachines() {
 function collectLineConfig() {
   return {
     line: {
-      rackType: document.getElementById('cfg-rack-type')?.value || 'fixed',
-      rackCount: parseInt(document.getElementById('cfg-rack-count')?.value) || 1,
-      rackLayers: parseInt(document.getElementById('cfg-rack-layers')?.value) || 3,
-      rackSlots: parseInt(document.getElementById('cfg-rack-slots')?.value) || 6,
       gripperType: document.getElementById('cfg-gripper-type')?.value || 'fixed-single',
       grabMode: document.getElementById('cfg-grab-mode')?.value || 'A-grab-B-place',
       palletEnabled: document.getElementById('cfg-pallet-enabled')?.value === 'yes',
-      palletSlots: parseInt(document.getElementById('cfg-pallet-slots')?.value) || 4,
-      racks: racksConfig,
-      machines: machinesConfig,
-      grippers: grippersConfig
+      palletSlots: parseInt(document.getElementById('cfg-pallet-slots')?.value) || 4
     },
+    racks: racksConfig,
+    machines: machinesConfig,
+    grippers: grippersConfig,
     plc: {
       ip: document.getElementById('cfg-plc-ip')?.value || '',
       port: parseInt(document.getElementById('cfg-plc-port')?.value) || 502,
@@ -274,6 +272,8 @@ function collectLineConfig() {
           openAllow: document.getElementById('cfg-signal-preset-open-allow')?.value || '',
           grabTaskNo: document.getElementById('cfg-signal-preset-grab-task')?.value || '',
           placeTaskNo: document.getElementById('cfg-signal-preset-place-task')?.value || '',
+          scanTaskNo: document.getElementById('cfg-signal-preset-scan-task')?.value || '',
+          returnHomeTaskNo: document.getElementById('cfg-signal-preset-home-task')?.value || '',
           doorLock: document.getElementById('cfg-signal-preset-door-lock')?.value || ''
         },
         rotary: {
@@ -290,6 +290,13 @@ function collectLineConfig() {
         }
       },
       dm: {}
+    },
+    scanner: {
+      type: document.getElementById('cfg-scanner-type')?.value || 'rcd',
+      rfidCom: document.getElementById('cfg-scanner-rfid-com')?.value || 'COM3',
+      rcdIp: document.getElementById('cfg-scanner-rcd-ip')?.value || '',
+      rcdPort: document.getElementById('cfg-scanner-rcd-port')?.value || '5000',
+      heartbeatInterval: parseInt(document.getElementById('cfg-scanner-heartbeat')?.value) || 60
     },
     workflow: workflowConfig
   };
@@ -333,23 +340,17 @@ async function loadLineConfig() {
     
     // 线体配置
     const line = data.line || {};
-    const rackTypeEl = document.getElementById('cfg-rack-type');
-    const rackCountEl = document.getElementById('cfg-rack-count');
-    const rackLayersEl = document.getElementById('cfg-rack-layers');
-    const rackSlotsEl = document.getElementById('cfg-rack-slots');
     const gripperTypeEl = document.getElementById('cfg-gripper-type');
     const grabModeEl = document.getElementById('cfg-grab-mode');
     const palletEnabledEl = document.getElementById('cfg-pallet-enabled');
     const palletSlotsEl = document.getElementById('cfg-pallet-slots');
     
-    if (rackTypeEl) rackTypeEl.value = line.rackType || 'fixed';
-    if (rackCountEl) rackCountEl.value = line.rackCount || 1;
-    if (rackLayersEl) rackLayersEl.value = line.rackLayers || 3;
-    if (rackSlotsEl) rackSlotsEl.value = line.rackSlots || 6;
     if (gripperTypeEl) { gripperTypeEl.value = line.gripperType || 'fixed-single'; onGripperTypeChange(); }
     if (grabModeEl) grabModeEl.value = line.grabMode || 'A-grab-B-place';
     if (palletEnabledEl) {
-      palletEnabledEl.value = line.palletEnabled ? 'yes' : 'no';
+      const pe = line.palletEnabled;
+      const palletOn = pe === true || pe === 'true' || pe === 'True' || pe === 'yes' || pe === '1';
+      palletEnabledEl.value = palletOn ? 'yes' : 'no';
       if (typeof updatePalletFields === 'function') updatePalletFields();
     }
     if (palletSlotsEl) palletSlotsEl.value = line.palletSlots || 4;
@@ -364,18 +365,31 @@ async function loadLineConfig() {
       r.openSignal = r.openSignal || '';
       r.doorClosed = r.doorClosed || '';
       r.doorFlag = r.doorFlag || '';
+      r.photoStartSignal = r.photoStartSignal || r.photoSignal || '';  // 兼容旧字段名
       r.grabStartTaskNo = r.grabStartTaskNo || r.grabTaskNo || '';  // 兼容旧字段名
       r.placeStartTaskNo = r.placeStartTaskNo || r.placeTaskNo || '';
       r.scanStartTaskNo = r.scanStartTaskNo || '';
       return r;
     }) : [];
-    machinesConfig = Array.isArray(line.machines) ? line.machines : [];
-    grippersConfig = Array.isArray(line.grippers) ? line.grippers : [];
+    machinesConfig = Array.isArray(line.machines) ? line.machines.map(function(m) {
+      m.hostKey = m.hostKey || '';
+      m.grabStartTaskNo = m.grabStartTaskNo || '';
+      m.placeStartTaskNo = m.placeStartTaskNo || '';
+      m.palletWorkNum = m.palletWorkNum || '1';
+      m.workCoords = m.workCoords || '';
+      return m;
+    }) : [];
+    grippersConfig = Array.isArray(line.grippers) ? line.grippers.map(function(g) {
+      g.rackIds = Array.isArray(g.rackIds) ? g.rackIds : [];
+      return g;
+    }) : [];
     renderRacks();
     renderMachines();
     renderGrippers();
     // 无料架时添加默认料架卡片
     if (racksConfig.length === 0) addRack();
+    // 以后端为准，同步本地缓存，避免旧缓存导致下次打开显示不一致
+    persistLineConfig();
     
     // PLC配置
     const plc = data.plc || {};
@@ -410,6 +424,8 @@ async function loadLineConfig() {
       'cfg-signal-preset-open-allow': presetSignals.openAllow,
       'cfg-signal-preset-grab-task': presetSignals.grabTaskNo,
       'cfg-signal-preset-place-task': presetSignals.placeTaskNo,
+      'cfg-signal-preset-scan-task': presetSignals.scanTaskNo,
+      'cfg-signal-preset-home-task': presetSignals.returnHomeTaskNo,
       'cfg-signal-preset-door-lock': presetSignals.doorLock,
       'cfg-signal-rotary-rotate': rotarySignals.rotate,
       'cfg-signal-rotary-zero': rotarySignals.zero,
@@ -422,6 +438,20 @@ async function loadLineConfig() {
     };
     
     Object.entries(signalMap).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = value || '';
+    });
+
+    // 扫码枪配置
+    const scanner = data.scanner || {};
+    const scannerMap = {
+      'cfg-scanner-type': scanner.type,
+      'cfg-scanner-rfid-com': scanner.rfidCom,
+      'cfg-scanner-rcd-ip': scanner.rcdIp,
+      'cfg-scanner-rcd-port': scanner.rcdPort,
+      'cfg-scanner-heartbeat': scanner.heartbeatInterval
+    };
+    Object.entries(scannerMap).forEach(([id, value]) => {
       const el = document.getElementById(id);
       if (el) el.value = value || '';
     });
@@ -521,23 +551,6 @@ function parseExcelConfig(data) {
     // 线体配置
     if (configName === '线体配置' || subItem) {
       switch (subItem) {
-        case '料架类型':
-          const rackTypeMap = { '固定料架': 'fixed', '旋转料架': 'rotating' };
-          const rackTypeEl = document.getElementById('cfg-rack-type');
-          if (rackTypeEl) rackTypeEl.value = rackTypeMap[value] || 'fixed';
-          break;
-        case '料架个数':
-          const rackCountEl = document.getElementById('cfg-rack-count');
-          if (rackCountEl && !isNaN(parseInt(value))) rackCountEl.value = parseInt(value);
-          break;
-        case '料架层数':
-          const rackLayersEl = document.getElementById('cfg-rack-layers');
-          if (rackLayersEl && !isNaN(parseInt(value))) rackLayersEl.value = parseInt(value);
-          break;
-        case '料架每层料位数':
-          const rackSlotsEl = document.getElementById('cfg-rack-slots');
-          if (rackSlotsEl && !isNaN(parseInt(value))) rackSlotsEl.value = parseInt(value);
-          break;
         case '夹爪类型':
           const gripperMap = {
             '固定单爪': 'fixed-single',
@@ -579,11 +592,7 @@ async function exportLineConfigExcel() {
     const config = collectLineConfig();
     const data = [
       ['配置项名称', '配置项细分', '具体数值'],
-      ['线体配置', '料架类型', config.line.rackType === 'fixed' ? '固定料架' : '旋转料架'],
-      ['', '料架个数', config.line.rackCount],
-      ['', '料架层数', config.line.rackLayers],
-      ['', '料架每层料位数', config.line.rackSlots],
-      ['', '夹爪类型', getGripperName(config.line.gripperType)],
+      ['线体配置', '夹爪类型', getGripperName(config.line.gripperType)],
       ['', '抓取方式', config.line.grabMode === 'A-grab-B-place' ? 'A抓B放' : 'B抓A放'],
       ['', '随行台有无', config.line.palletEnabled ? '有' : '无'],
       ['', '随行台料位数', config.line.palletSlots],

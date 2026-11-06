@@ -56,8 +56,15 @@ namespace change_machine
             LogHelper.Info( "开始执行传输程序流程...");
             LogHelper.Info( $"获取到待上传工件: {workpiecename}");
 
+            // 处理工件名：若含 J/C，用对应字母分割取第一个元素，再加回该字母
+            string processedName = workpiecename;
+            if (processedName.Contains("J"))
+                processedName = processedName.Split('J')[0] + "J";
+            else if (processedName.Contains("C"))
+                processedName = processedName.Split('C')[0] + "C";
+
             // 从共享服务器搜索名称为"工件名称后缀.nc"的文件
-            string ncFileName = workpiecename + ".nc";
+            string ncFileName = processedName + ".nc";
             string shareFilePath = Path.Combine(ShareServerPath, ncFileName);
             string localFilePath = Path.Combine(LocalTempPath, ncFileName);
             string machineFilePath = Path.Combine(MachineNcPath, ncFileName);
@@ -174,7 +181,10 @@ namespace change_machine
 
                     if (cfg.ContainsKey("database"))
                     {
-                        var db = Js.Deserialize<Dictionary<string, object>>(cfg["database"].ToString());
+                        var dbRaw = cfg["database"];
+                        Dictionary<string, object> db = dbRaw is Dictionary<string, object> dDict
+                            ? dDict
+                            : Js.Deserialize<Dictionary<string, object>>(dbRaw.ToString());
                         string host = db.ContainsKey("host") ? db["host"].ToString() : "localhost";
                         string dbname = db.ContainsKey("database") ? db["database"].ToString() : "qianduantest";
                         string user = db.ContainsKey("user") ? db["user"].ToString() : "root";
@@ -185,7 +195,10 @@ namespace change_machine
                     // 加载共享服务器配置
                     if (cfg.ContainsKey("share_server"))
                     {
-                        var share = Js.Deserialize<Dictionary<string, object>>(cfg["share_server"].ToString());
+                        var shareRaw = cfg["share_server"];
+                        Dictionary<string, object> share = shareRaw is Dictionary<string, object> sDict
+                            ? sDict
+                            : Js.Deserialize<Dictionary<string, object>>(shareRaw.ToString());
                         if (share.ContainsKey("path")) ShareServerPath = share["path"].ToString();
                         if (share.ContainsKey("local_temp")) LocalTempPath = share["local_temp"].ToString();
                         if (share.ContainsKey("machine_nc_path")) MachineNcPath = share["machine_nc_path"].ToString();

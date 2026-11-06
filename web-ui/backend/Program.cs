@@ -19,9 +19,12 @@ namespace MachineMonitor
             EnsureDirectories();
             WorkflowService.EnsureSteps();
 
-            // 启动 HTTP 服务
+            // 启动 HTTP 服务（同时监听 localhost 与 127.0.0.1，避免子程序/自身日志上报 localhost 时解析为 IPv6 ::1 而连接失败）
             var listener = new HttpListener();
-            listener.Prefixes.Add($"http://127.0.0.1:{AppState.Port}/");
+            try { listener.Prefixes.Add($"http://localhost:{AppState.Port}/"); }
+            catch (Exception ex) { LogHelper.Warn("[HTTP] localhost 前缀注册失败: " + ex.Message); }
+            try { listener.Prefixes.Add($"http://127.0.0.1:{AppState.Port}/"); }
+            catch (Exception ex) { LogHelper.Warn("[HTTP] 127.0.0.1 前缀注册失败: " + ex.Message); }
             listener.Start();
             LogHelper.Info($"[MachineMonitor] HTTP 服务已启动 http://localhost:{AppState.Port}/");
             LogHelper.Info($"[MachineMonitor] 当前状态: 等待启动指令 | 数据查询接口已就绪");

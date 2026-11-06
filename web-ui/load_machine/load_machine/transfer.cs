@@ -1,4 +1,5 @@
 ﻿using DataCommonOperate;
+using ProgramDeal;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,6 +18,7 @@ namespace load_machine
         static string ShareServerPath = @"\\192.168.1.100\share";  // 共享服务器路径
         static string LocalTempPath = @"D:\nc_files";               // 本地临时目录
         static string MachineNcPath = @"C:\NCFiles";                // 机床NC文件目录
+        static string ProgramAutoPath = @"D:\programauto";          // 本地程序根目录（备料流程已下载）
 
         // 配置：始终与 MachineMonitor.exe 执行路径一致
         // 从当前运行目录向上逐级查找 config.json，避免受 subs/ 嵌套层级影响
@@ -48,89 +50,135 @@ namespace load_machine
         /// <summary>
         /// 执行传输程序流程
         /// </summary>
-       public bool RunTransferProcess(string ip, string workpiecename)
+       public bool RunTransferProcess(int macnum, string ip, string workpiecename)
         {
             bool flag = false;
             LoadConfig();
             LogHelper.Info( "开始执行传输程序流程...");
             LogHelper.Info( $"获取到待上传工件: {workpiecename}");
 
-            // 从共享服务器搜索名称为"工件名称后缀.nc"的文件
-            string ncFileName = workpiecename + ".nc";
-            string shareFilePath = Path.Combine(ShareServerPath, ncFileName);
-            string localFilePath = Path.Combine(LocalTempPath, ncFileName);
-            string machineFilePath = Path.Combine(MachineNcPath, ncFileName);
+            // 处理工件名：若含 J/C，用对应字母分割取第一个元素，再加回该字母
+            string processedName = workpiecename;
+            if (processedName.Contains("J"))
+                processedName = processedName.Split('J')[0] + "J";
+            else if (processedName.Contains("C"))
+                processedName = processedName.Split('C')[0] + "C";
 
-            LogHelper.Info( $"共享服务器文件路径: {shareFilePath}");
+            // 从本地程序根目录读取（备料流程已下载到本地）
+            string mpfFileName = processedName + ".mpf";
+            string localFilePath = Path.Combine(ProgramAutoPath, mpfFileName);
 
-            // 检查共享服务器文件是否存在
-            if (!File.Exists(shareFilePath))
+            LogHelper.Info( $"本地程序文件路径: {localFilePath}");
+
+            // 检查本地程序文件是否存在
+            if (!File.Exists(localFilePath))
             {
-                LogHelper.Error( $"共享服务器文件不存在: {shareFilePath}");
+                LogHelper.Error( $"本地程序文件不存在: {localFilePath}");
                 return false;
             }
 
-            // 用文件流复制到本地指定路径
+            // 通过 maccommunicate 的 siemence 上传到机床
+            string remoteDir = Program.GetMachineNcPath(macnum);
+            if (string.IsNullOrEmpty(remoteDir))
+            {
+                LogHelper.Error("未配置机床" + macnum + "的NC路径，无法上传程序");
+                return false;
+            }
             try
             {
-                File.Copy(shareFilePath, localFilePath, true);
-                LogHelper.Info( $"文件已复制到本地: {localFilePath}");
-            }
-            catch (Exception ex)
-            {
-                LogHelper.Error( $"复制文件到本地失败: {ex.Message}");
-            }
-
-            // 复制成功后用文件流复制到机床指定路径
-            try
-            {
-                // 通过SMB协议复制到机床
-                string machineSharePath = $@"\\{ip}\{MachineNcPath.Replace(":", "")}";
-
-                // 确保机床目标目录存在（如果可以访问）
-                try
-                {
-                    if (!Directory.Exists(machineSharePath))
-                    {
-                        // 尝试创建目录
-                        try
-                        {
-                            Directory.CreateDirectory(machineSharePath);
-                        }
-                        catch
-                        {
-                            // 目录可能无法创建，继续尝试复制文件
-                        }
-                    }
-                }
-                catch
-                {
-                    // 忽略目录检查错误
-                }
-
-                // 复制文件到机床
-                string machineFileFullPath = $@"\\{ip}\{MachineNcPath.Replace(":", "")}\{ncFileName}";
-                File.Copy(localFilePath, machineFileFullPath, true);
-                if(File.Exists(machineFileFullPath))
-                {
-                    flag = true;
-                    LogHelper.Info( $"文件已复制到机床: {machineFileFullPath}");
-                }
+                flag = Program.UploadProgramToMac(macnum, localFilePath, remoteDir + "/" + mpfFileName);
+                if (flag)
+                    LogHelper.Info( $"程序已上传到机床: {mpfFileName}");
                 else
-                {
-                    flag = false;
-                    LogHelper.Error( $"复制文件到机床失败");
-                }
+                    LogHelper.Error( "上传程序到机床失败");
             }
             catch (Exception ex)
             {
                 flag = false;
-                LogHelper.Error( $"复制文件到机床失败: {ex.Message}");
-                // 即使复制到机床失败，本地文件已存在，可以手动上传
+                LogHelper.Error( $"上传程序到机床异常: {ex.Message}");
             }
 
             LogHelper.Info( "传输程序流程结束");
             return flag;
+        }
+
+        /// <summary>
+        /// 合并多个工件的程序为一个程序（使用 ProgramDeal.transformpro.MergeProgram，内置坐标系替换 G54->G55/G56/G57/G58/G59）
+        /// </summary>
+        /// <param name="ip">机床IP</param>
+        /// <param name="workpieces">按工位顺序的工件名列表</param>
+        /// <param name="coords">按工位顺序的坐标系编号列表（transformpro 使用固定 G54-G59 映射，此参数保留用于后续扩展）</param>
+        public bool MergeAndUpload(int macnum, string ip, List<string> workpieces, List<string> coords)
+        {
+            try
+            {
+                LoadConfig();
+                if (workpieces == null || workpieces.Count == 0)
+                {
+                    LogHelper.Error( "合并程序失败：工件列表为空");
+                    return false;
+                }
+                LogHelper.Info( $"开始合并程序：共 {workpieces.Count} 个工件");
+
+                // 1. 读取本地程序（备料流程已下载到本地），并构造程序路径列表
+                var polprogrampathlist = new List<string[]>();
+                for (int i = 0; i < workpieces.Count; i++)
+                {
+                    // 处理工件名：若含 J/C，用对应字母分割取第一个元素，再加回该字母
+                    string processedPiece = workpieces[i];
+                    if (processedPiece.Contains("J"))
+                    {
+                        processedPiece = processedPiece.Split('J')[0] + "J";
+                    }
+                    else if (processedPiece.Contains("C"))
+                    {
+                        processedPiece = processedPiece.Split('C')[0] + "C";
+                    }
+
+                    string localFilePath = Path.Combine(ProgramAutoPath, processedPiece + ".mpf");
+                    if (!File.Exists(localFilePath))
+                    {
+                        LogHelper.Error( $"本地程序文件不存在: {localFilePath}");
+                        return false;
+                    }
+                    // [子目录, 文件名（不含扩展名）]
+                    polprogrampathlist.Add(new string[] { "", processedPiece });
+                }
+
+                // 2. 使用 transformpro.MergeProgram 合并（内置坐标系替换 G54->G55/G56/G57/G58/G59）
+                string mergeFileName = "NCPROGRAM.mpf";
+                string mergeProgramPath = Path.Combine(ProgramAutoPath, mergeFileName);
+                if (File.Exists(mergeProgramPath)) File.Delete(mergeProgramPath);
+                var transform = new transformpro("", "", "");
+                transform.MergeProgram(new List<string>(), mergeProgramPath, ProgramAutoPath, polprogrampathlist, coords);
+
+                if (!File.Exists(mergeProgramPath))
+                {
+                    LogHelper.Error( "合并程序生成失败");
+                    return false;
+                }
+                LogHelper.Info( $"合并程序已生成: {mergeProgramPath}");
+
+                // 3. 通过 maccommunicate 的 siemence 上传合并后的程序到机床
+                string remoteDir = Program.GetMachineNcPath(macnum);
+                if (string.IsNullOrEmpty(remoteDir))
+                {
+                    LogHelper.Error("未配置机床" + macnum + "的NC路径，无法上传合并程序");
+                    return false;
+                }
+                if (!Program.UploadProgramToMac(macnum, mergeProgramPath, remoteDir + "/" + mergeFileName))
+                {
+                    LogHelper.Error( "合并程序上传到机床失败");
+                    return false;
+                }
+                LogHelper.Info( $"合并程序已上传到机床: {mergeFileName}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Error( $"合并程序异常: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>

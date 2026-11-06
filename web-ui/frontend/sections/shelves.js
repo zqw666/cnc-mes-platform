@@ -14,7 +14,9 @@
       if (!res.success) { fillDefault(); return; }
       const allRows = Array.isArray(res.data?.rack_administrate) ? res.data.rack_administrate : [];
       Object.keys(grids).forEach(type => {
-        const rows = allRows.filter(r => (r.racktype || '').toString().toLowerCase() === type).sort((a, b) => a.id - b.id);
+        // racktype 为数字：1=电极 2=钢件 3=刀具 4=托盘 5=铝板电极
+        const racktypeNum = RACKTYPE_MAP[type];
+        const rows = allRows.filter(r => Number(r.racktype) === racktypeNum).sort((a, b) => a.id - b.id);
         shelves[type] = [];
         for (let i = 1; i <= DEFAULT_SLOTS[type]; i++) {
           const row = rows[i - 1];
@@ -22,8 +24,8 @@
             id: Number(row.id), rfid: row.rfid || '', posstatus: Number(row.posstatus || 0),
             workstate: Number(row.workstate || 0), scanstatus: Number(row.scanstatus || 0),
             priority: Number(row.priority || 0), racknum: Number(row.racknum || 1),
-            activated: false, selected: false
-          } : { id: i, rfid: '', posstatus: 0, workstate: 0, scanstatus: 0, priority: 0, racknum: 1, activated: false, selected: false });
+            workpiecename: row.workpiecename || '', activated: false, selected: false
+          } : { id: i, rfid: '', posstatus: 0, workstate: 0, scanstatus: 0, priority: 0, racknum: 1, workpiecename: '', activated: false, selected: false });
         }
       });
     } catch (e) {
@@ -33,18 +35,17 @@
   }
 
   function shelfStatus(row, type) {
-    if (type === 'steel') {
-      if (row.scanstatus === 0) return 'to-scan';
-      if (row.workstate === 1) return 'processing';
-      if (row.workstate === 2) return 'completed';
-      if (row.priority === 1) return 'urgent';
-      if (row.posstatus === 1) return 'pending';
-      return 'no-material';
-    }
+    // 加工中/加工完成优先（工件在机床，料位 posstatus=1）
     if (row.workstate === 1) return 'processing';
     if (row.workstate === 2) return 'completed';
-    if (row.posstatus === 1) return 'pending';
-    return 'no-material';
+    // 有工件在料架（posstatus=2）：读 scanstatus
+    if (row.posstatus === 2) {
+      if (row.scanstatus === 0) return 'to-scan';     // 待扫描
+      if (row.scanstatus === 2) return 'scan-failed'; // 扫描失败
+      return 'pending';                                // 扫描成功 → 待加工
+    }
+    // 无工件：posstatus=0 禁用，posstatus=1 无料
+    return row.posstatus === 0 ? 'disabled' : 'no-material';
   }
 
   function getStatusText(status) {
@@ -54,6 +55,7 @@
       'completed': '已完成',
       'to-scan': '待扫描',
       'no-material': '无料',
+      'scan-failed': '扫描失败',
       'error': '错误',
       'disabled': '禁用',
       'urgent': '急件'
@@ -70,12 +72,24 @@
       const item = document.createElement('div');
       item.className = 'shelf-item ' + (shelf.activated ? 'activated' : 'locked');
       item.dataset.status = status;
-      const partName = shelf.partName || (shelf.rfid ? '未知工件' : '-');
+      const hasWorkpiece = !!(shelf.workstate > 0 || shelf.posstatus === 2);
+      let infoRows;
+      if (hasWorkpiece) {
+        // 有工件：显示工件监控编号 + 状态
+        const wsText = getStatusText(status);
+        infoRows =
+          '<div class="shelf-info-row"><span class="shelf-info-label">监控:</span><span class="shelf-info-value shelf-rfid">' + (shelf.rfid || '-') + '</span></div>' +
+          '<div class="shelf-info-row"><span class="shelf-info-label">状态:</span><span class="shelf-info-value">' + wsText + '</span></div>';
+      } else {
+        // 无工件：显示料位状态（禁用 or 无料）
+        const psText = shelf.posstatus === 0 ? '禁用' : '无料';
+        infoRows =
+          '<div class="shelf-info-row"><span class="shelf-info-label">料位状态:</span><span class="shelf-info-value">' + psText + '</span></div>';
+      }
       item.innerHTML = `
         <input type="checkbox" class="shelf-checkbox" data-id="${shelf.id}" ${shelf.selected ? 'checked' : ''}>
         <div class="shelf-position">#${shelf.id}</div>
-        <div class="shelf-info-row"><span class="shelf-info-label">监控:</span><span class="shelf-info-value shelf-rfid">${shelf.rfid || '-'}</span></div>
-        <div class="shelf-info-row"><span class="shelf-info-label">工件:</span><span class="shelf-info-value shelf-partname">${partName}</span></div>
+        ${infoRows}
         <div class="shelf-status status-text-${status}"></div>
       `;
       grid.appendChild(item);
@@ -107,19 +121,10 @@
       const res = await apiPost('/api/rack/status', { type, ids, status });
       if (res.success) {
         selected.forEach(s => {
-          s.selected = false;
-          if (type === 'steel') {
-            if (status === 'no-material') s.posstatus = 0;
-            else if (status === 'disable') { s.posstatus = 0; s.workstate = 0; s.scanstatus = 0; }
-            else if (status === 'urgent') s.priority = 1;
-            else if (status === 'activate') s.scanstatus = 1;
-            else if (status === 'lock') s.scanstatus = 0;
-          } else {
-            if (status === 'no-material') s.posstatus = 0;
-            else if (status === 'disable') { s.posstatus = 0; s.workstate = 0; }
-            else if (status === 'activate') s.workstate = 1;
-            else if (status === 'lock') s.workstate = 0;
-          }
+          s.selected = false;   // 重置选中单选框（料位保持激活状态）
+          if (status === 'disable') { s.posstatus = 0; s.workstate = 0; s.scanstatus = 0; }        // 禁用
+          else if (status === 'no-material') { s.posstatus = 1; s.workstate = 0; s.scanstatus = 0; } // 无料
+          else if (status === 'urgent') s.priority = 1;
         });
         toast('状态已更新', 'success');
       } else { toast(res.message || '更新失败', 'error'); }

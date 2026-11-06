@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>环节元数据 · 配置驱动验证</title>
+<style>
+:root{--blue:#1677ff;--bd:#f0f0f0;--bd2:#d9d9d9;--t1:rgba(0,0,0,.88);--t2:rgba(0,0,0,.65);--t3:rgba(0,0,0,.45)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px;color:var(--t1);background:#f5f5f5;height:100vh;display:flex;flex-direction:column}
+.top{background:#fff;border-bottom:1px solid var(--bd);padding:12px 20px;display:flex;align-items:center;gap:12px;flex:0 0 auto}
+.top h1{font-size:15px;font-weight:600}
+.top .meta{font-size:12px;color:var(--t3);margin-left:auto}
+.tag{font-size:11px;padding:1px 8px;border-radius:10px;background:#e6f4ff;color:#0958d9;border:1px solid #91caff}
+.main{flex:1;display:flex;min-height:0}
+.side{width:230px;flex:0 0 230px;background:#fff;border-right:1px solid var(--bd);overflow-y:auto;padding:10px 0}
+.grp{font-size:11px;color:var(--t3);padding:12px 16px 6px;letter-spacing:.5px}
+.item{padding:7px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;border-left:2px solid transparent}
+.item:hover{background:#fafafa}
+.item.on{background:#e6f4ff;border-left-color:var(--blue);color:#0958d9;font-weight:500}
+.item .k{font-size:11px;color:var(--t3);margin-left:auto;font-family:Consolas,monospace}
+.item.on .k{color:#4096ff}
+.content{flex:1;overflow-y:auto;padding:20px;display:flex;gap:20px;min-width:0}
+.card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:18px 20px}
+.left-card{flex:1;min-width:0;max-width:420px}
+.right-card{flex:1;min-width:0}
+.card h2{font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h2 .badge{font-size:11px;font-weight:400;color:var(--t3);background:#fafafa;border:1px solid var(--bd);padding:1px 7px;border-radius:10px}
+pre{background:#fafafa;border:1px solid var(--bd);border-radius:8px;padding:12px;overflow:auto;font-size:11.5px;line-height:1.6;font-family:Consolas,monospace;color:#24292f;max-height:calc(100vh - 300px)}
+.btns{display:flex;gap:8px;margin-top:14px}
+button{height:30px;padding:0 14px;font-size:12px;border-radius:6px;border:1px solid var(--bd2);background:#fff;cursor:pointer;font-family:inherit}
+button:hover{border-color:#4096ff;color:var(--blue)}
+button.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+button.pri:hover{background:#4096ff;color:#fff}
+.empty{color:var(--t3);font-size:12px;padding:30px 0;text-align:center}
+.hint{font-size:11.5px;color:var(--t3);line-height:1.7;margin-top:12px;padding-top:12px;border-top:1px dashed var(--bd2)}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>环节元数据 · 配置驱动验证</h1>
+  <span class="tag" id="stat">加载中</span>
+  <span class="meta">数据源 /api/node-types → node-types.json</span>
+</div>
+
+<div class="main">
+  <div class="side" id="side"></div>
+  <div class="content">
+    <div class="card left-card">
+      <h2>属性面板 <span class="badge" id="curKey">未选中</span></h2>
+      <div id="form"><div class="empty">左侧选一个环节</div></div>
+      <div class="btns">
+        <button class="pri" id="btnRead">读取当前值</button>
+        <button id="btnReset">重置</button>
+      </div>
+      <div class="hint">
+        这块面板里没有任何一个控件是手写的。所有输入框、下拉框、开关，都是根据
+        <code>node-types.json</code> 里声明的字段类型现场生成的。
+      </div>
+    </div>
+
+    <div class="card right-card">
+      <h2>当前值 <span class="badge" id="srcBadge">read() 结果</span></h2>
+      <pre id="out">// 点「读取当前值」</pre>
+    </div>
+  </div>
+</div>
+
+<script src="renderer.js"></script>
+<script>
+(function () {
+  var meta = null, curKey = null, values = {};
+
+  function el(id) { return document.getElementById(id); }
+
+  function load() {
+    fetch('/api/node-types')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        meta = d;
+        el('stat').textContent = (d.nodes || []).length + ' 个环节 · ' + (d.groups || []).length + ' 个分组';
+        renderSide();
+        // 默认选第一个
+        if (d.nodes && d.nodes.length) select(d.nodes[0].key);
+      })
+      .catch(function (e) {
+        el('stat').textContent = '加载失败';
+        el('side').innerHTML = '<div class="empty">接口不可用<br>' + e.message + '</div>';
+      });
+  }
+
+  function renderSide() {
+    var html = '';
+    (meta.groups || []).forEach(function (g) {
+      var items = (meta.nodes || []).filter(function (n) { return n.group === g.key; });
+      if (!items.length) return;
+      html += '<div class="grp">' + g.name + '（' + items.length + '）</div>';
+      items.forEach(function (n) {
+        html += '<div class="item" data-key="' + n.key + '">'
+              + '<span>' + n.display + '</span>'
+              + '<span class="k">' + n.key + '</span></div>';
+      });
+    });
+    el('side').innerHTML = html;
+
+    el('side').addEventListener('click', function (e) {
+      var it = e.target.closest('.item');
+      if (it) select(it.getAttribute('data-key'));
+    });
+  }
+
+  function select(key) {
+    curKey = key;
+    Array.prototype.forEach.call(document.querySelectorAll('.item'), function (n) {
+      n.classList.toggle('on', n.getAttribute('data-key') === key);
+    });
+    el('curKey').textContent = key;
+
+    var fields = NodeRenderer.fieldsFor(meta, key);
+    NodeRenderer.render(el('form'), fields, values, function (name, val, all) {
+      values = all;
+    });
+    el('out').textContent = '// 面板已按 ' + fields.length + ' 个字段声明生成\n// 点「读取当前值」看结果';
+  }
+
+  el('btnRead').addEventListener('click', function () {
+    var v = NodeRenderer.read(el('form'));
+    values = v;
+    el('out').textContent = JSON.stringify(v, null, 2);
+  });
+
+  el('btnReset').addEventListener('click', function () {
+    values = {};
+    if (curKey) select(curKey);
+    el('out').textContent = '// 已重置为默认值';
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

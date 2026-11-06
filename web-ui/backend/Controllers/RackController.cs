@@ -54,8 +54,18 @@ namespace MachineMonitor
             return AppState.Json(new
             {
                 success = true,
+                version = AppState.RackDataVersion,
                 data = new { rack_administrate = rackAdmin, knife_rack = knifeRack, rackUpdateCount }
             });
+        }
+
+        /// <summary>
+        /// 子程序更新料位后通知：递增料架数据版本号，前端据此刷新页面图标
+        /// </summary>
+        public static string NotifyRackChanged(string raw)
+        {
+            AppState.NotifyRackDataChanged();
+            return AppState.Json(new { success = true, message = "料架数据已更新", version = AppState.RackDataVersion });
         }
 
         public static string UpdateRackStatus(string raw)
@@ -66,24 +76,66 @@ namespace MachineMonitor
                 if (body == null)
                     return AppState.Json(new { success = false, message = "无效的 JSON 数据" });
 
-                string rackId = body.ContainsKey("rackId") ? body["rackId"].ToString() : "";
-                int position = body.ContainsKey("position") ? Convert.ToInt32(body["position"]) : 0;
+                string type = body.ContainsKey("type") ? body["type"].ToString() : "";
                 string status = body.ContainsKey("status") ? body["status"].ToString() : "";
+
+                // 解析选中的料位编号列表
+                var ids = new List<int>();
+                if (body.ContainsKey("ids") && body["ids"] != null)
+                {
+                    object idsRaw = body["ids"];
+                    if (idsRaw is ArrayList al)
+                    {
+                        foreach (var item in al) ids.Add(Convert.ToInt32(item));
+                    }
+                    else if (idsRaw is object[] arr)
+                    {
+                        foreach (var item in arr) ids.Add(Convert.ToInt32(item));
+                    }
+                    else
+                    {
+                        ids.Add(Convert.ToInt32(idsRaw));
+                    }
+                }
+
+                if (ids.Count == 0)
+                    return AppState.Json(new { success = false, message = "未选中料位" });
+
+                // 前端分页 type -> racktype 映射（1=电极 2=钢件 3=刀具 4=托盘 5=铝板电极）
+                int racktype = 0;
+                switch (type)
+                {
+                    case "electrode": racktype = 1; break;
+                    case "steel": racktype = 2; break;
+                    case "tool": racktype = 3; break;
+                    case "pallet": racktype = 4; break;
+                    case "aluminum": racktype = 5; break;
+                    default: racktype = 0; break;
+                }
+
+                string idList = string.Join(",", ids);
 
                 var db = DatabaseRepository.CreateDb();
                 string sql = "";
-                if (status == "to-scan")
-                    sql = "UPDATE rack_administrate SET scanstatus=0 WHERE id LIKE '" + position + "%' AND posstatus=1";
+                if (status == "disable")
+                    // 禁用：料位状态=0
+                    sql = "UPDATE rack_administrate SET posstatus=0 WHERE racktype=" + racktype + " AND id IN (" + idList + ")";
+                else if (status == "no-material")
+                    // 无料：料位状态=1
+                    sql = "UPDATE rack_administrate SET posstatus=1 WHERE racktype=" + racktype + " AND id IN (" + idList + ")";
+                else if (status == "to-scan")
+                    sql = "UPDATE rack_administrate SET scanstatus=0 WHERE racktype=" + racktype + " AND id IN (" + idList + ")";
                 else if (status == "scanned")
-                    sql = "UPDATE rack_administrate SET scanstatus=1 WHERE id=" + position;
+                    sql = "UPDATE rack_administrate SET scanstatus=1 WHERE racktype=" + racktype + " AND id IN (" + idList + ")";
                 else if (status == "occupied")
-                    sql = "UPDATE rack_administrate SET workstate=1 WHERE id='" + rackId + "'";
+                    sql = "UPDATE rack_administrate SET workstate=1 WHERE racktype=" + racktype + " AND id IN (" + idList + ")";
                 else if (status == "empty")
-                    sql = "UPDATE rack_administrate SET workstate=0,workpiecename=NULL WHERE id='" + rackId + "'";
+                    sql = "UPDATE rack_administrate SET workstate=0,workpiecename=NULL WHERE racktype=" + racktype + " AND id IN (" + idList + ")";
 
                 if (!string.IsNullOrEmpty(sql))
                     db.ExecuteSql(sql);
 
+                AppState.NotifyRackDataChanged();
                 return AppState.Json(new { success = true, message = "料架状态已更新" });
             }
             catch (Exception ex)
@@ -125,7 +177,7 @@ namespace MachineMonitor
                     { "number", body.ContainsKey("number") ? body["number"].ToString() : (racks.Count + 1).ToString() },
                     { "rows", body.ContainsKey("rows") ? body["rows"].ToString() : "3" },
                     { "cols", body.ContainsKey("cols") ? body["cols"].ToString() : "6" },
-                    { "photoSignal", body.ContainsKey("photoSignal") ? body["photoSignal"].ToString() : "" },
+                    { "photoStartSignal", body.ContainsKey("photoStartSignal") ? body["photoStartSignal"].ToString() : "" },
                     { "openRequest", body.ContainsKey("openRequest") ? body["openRequest"].ToString() : "" },
                     { "openSignal", body.ContainsKey("openSignal") ? body["openSignal"].ToString() : "" },
                     { "doorClosed", body.ContainsKey("doorClosed") ? body["doorClosed"].ToString() : "" },

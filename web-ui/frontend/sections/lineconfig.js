@@ -18,28 +18,6 @@ function toast(msg, type = 'info') {
   setTimeout(() => box.remove(), 3000);
 }
 
-// 从线体配置栏表单添加料架（仅本地，点击保存配置后统一提交）
-function addRackFromForm() {
-  const rackType = document.getElementById('cfg-rack-type').value;
-  const rackCount = parseInt(document.getElementById('cfg-rack-count').value) || 1;
-  const rackLayers = parseInt(document.getElementById('cfg-rack-layers').value) || 8;
-  const rackSlots = parseInt(document.getElementById('cfg-rack-slots').value) || 10;
-  const rackName = document.getElementById('cfg-rack-name').value.trim() || '';
-  const typeMap = { 'fixed': '1', 'rotating': '2' };
-  const type = typeMap[rackType] || '1';
-  for (let i = 0; i < rackCount; i++) {
-    addRack({
-      id: Date.now() + i,
-      type: type,
-      number: rackCount > 1 ? racksConfig.length + 1 : i + 1,
-      rows: rackLayers,
-      cols: rackSlots,
-      name: rackName || `料架${racksConfig.length + 1}`
-    });
-  }
-  toast(`已添加 ${rackCount} 个料架，点击「保存配置」提交`, 'success');
-}
-
 // 从线体配置栏表单添加机床（仅本地，点击保存配置后统一提交）
 function addMachineFromForm() {
   const brand = document.getElementById('cfg-machine-brand').value || 'roders';
@@ -87,7 +65,8 @@ function addGripper(data) {
     number: data.number || count,
     slotPhotoSignal: data.slotPhotoSignal || '',
     grabTaskNo: data.grabTaskNo || '',
-    placeTaskNo: data.placeTaskNo || ''
+    placeTaskNo: data.placeTaskNo || '',
+    rackIds: Array.isArray(data.rackIds) ? data.rackIds : []
   };
   grippersConfig.push(gripper);
   persistLineConfig();
@@ -112,6 +91,7 @@ function renderGrippers() {
   if (!container) return;
   if (grippersConfig.length === 0) { container.innerHTML = ''; return; }
   container.innerHTML = grippersConfig.map(function(g, index) {
+    var rackCheckboxes = rackCheckboxesHtml(g, index);
     return '<div class="card-item">' +
       '<div class="card-header"><span class="card-title">' + (g.name || '夹爪' + (index+1)) + '</span>' +
       '<button class="btn-remove" onclick="removeGripper(' + index + ')" title="删除">×</button></div>' +
@@ -124,22 +104,52 @@ function renderGrippers() {
         '<option value="pallet"' + (g.type==='pallet'?' selected':'') + '>托盘夹爪</option>' +
       '</select></div>' +
       '<div class="config-field"><label>料位光电信号</label><input type="text" class="config-input" value="' + (g.slotPhotoSignal || '') + '" placeholder="如：104.00" onchange="updateGripper(' + index + ', \'slotPhotoSignal\', this.value)"></div>' +
-      '<div class="config-field"><label>取夹爪任务号</label><input type="text" class="config-input" value="' + (g.grabTaskNo || '') + '" placeholder="如：D400" onchange="updateGripper(' + index + ', \'grabTaskNo\', this.value)"></div>' +
-      '<div class="config-field"><label>放夹爪任务号</label><input type="text" class="config-input" value="' + (g.placeTaskNo || '') + '" placeholder="如：D500" onchange="updateGripper(' + index + ', \'placeTaskNo\', this.value)"></div>' +
+      '<div class="config-field"><label>取夹爪任务号</label><input type="text" class="config-input" value="' + (g.grabTaskNo || '') + '" placeholder="如：400" onchange="updateGripper(' + index + ', \'grabTaskNo\', this.value)"></div>' +
+      '<div class="config-field"><label>放夹爪任务号</label><input type="text" class="config-input" value="' + (g.placeTaskNo || '') + '" placeholder="如：500" onchange="updateGripper(' + index + ', \'placeTaskNo\', this.value)"></div>' +
+      rackCheckboxes +
       '</div></div>';
   }).join('');
+}
+
+// 夹爪关联料架：多选框（料架来自线体配置的料架配置板块）
+function rackCheckboxesHtml(g, index) {
+  var racks = racksConfig || [];
+  if (racks.length === 0) {
+    return '<div class="config-field"><label>关联料架</label><span class="config-hint">暂无料架，请先在下方「料架配置」添加料架</span></div>';
+  }
+  var linked = (Array.isArray(g.rackIds) ? g.rackIds : []).map(function(id) { return String(id); });
+  var boxes = racks.map(function(r) {
+    var rid = String(r.id);
+    var checked = linked.indexOf(rid) >= 0 ? ' checked' : '';
+    return '<label class="rack-check-item"><input type="checkbox" value="' + rid + '"' + checked + ' onchange="toggleGripperRack(' + index + ', \'' + rid + '\', this.checked)">' + escapeHtml(r.name || ('料架' + r.number)) + '</label>';
+  }).join('');
+  return '<div class="config-field"><label>关联料架</label><div class="rack-check-list">' + boxes + '</div></div>';
+}
+
+// 切换夹爪关联的料架
+function toggleGripperRack(index, rackId, checked) {
+  if (!grippersConfig[index]) return;
+  if (!Array.isArray(grippersConfig[index].rackIds)) grippersConfig[index].rackIds = [];
+  var list = grippersConfig[index].rackIds.map(function(id) { return String(id); });
+  var rid = String(rackId);
+  var pos = list.indexOf(rid);
+  if (checked && pos < 0) list.push(rid);
+  if (!checked && pos >= 0) list.splice(pos, 1);
+  grippersConfig[index].rackIds = list;
+  persistLineConfig();
 }
 
 // 添加料架到本地配置
 function addRack(data = {}) {
   const rack = {
     id: data.id || Date.now(),
-    type: data.type || 'electrode',   // electrode | tool | steel | pallet
+    type: data.type || 'electrode',   // electrode | aluminum | tool | steel
     name: data.name || `料架${racksConfig.length + 1}`,
-    number: data.number || racksConfig.length + 1,
-    rows: data.rows || 8,
-    cols: data.cols || 10,
-    photoSignal: data.photoSignal || '',
+    number: data.number != null ? String(data.number) : String(racksConfig.length + 1),
+    rows: data.rows != null ? String(data.rows) : '8',
+    cols: data.cols != null ? String(data.cols) : '10',
+    photoStartSignal: data.photoStartSignal || '',
+    photoResetSignal: data.photoResetSignal || '',  // 光电复位开始信号
     openRequest: data.openRequest || '',   // 人工开门请求信号
     openSignal: data.openSignal || '',      // 允许开门信号（软件→PLC）
     doorClosed: data.doorClosed || '',      // 门状态信号（1=关, 0=开）
@@ -165,7 +175,13 @@ function addMachine(data = {}) {
     ncPath: data.ncPath || '',
     sessionUrl: data.sessionUrl || '',
     username: data.username || '',
-    password: data.password || ''
+    password: data.password || '',
+    hostKey: data.hostKey || '',
+    grabStartTaskNo: data.grabStartTaskNo || '',
+    placeStartTaskNo: data.placeStartTaskNo || '',
+    palletWorkNum: data.palletWorkNum || '1',
+    workCoords: data.workCoords || '',
+    startProcessSignal: data.startProcessSignal || ''
   };
   machinesConfig.push(machine);
   persistLineConfig();
@@ -219,21 +235,22 @@ function renderRacks() {
       '<div class="config-field"><label>料架名称</label><input type="text" class="config-input" value="' + (rack.name || '') + '" placeholder="料架名称" onchange="updateRack(' + index + ', \'name\', this.value)"></div>' +
       '<div class="config-field"><label>料架类型</label><select class="config-input" onchange="updateRack(' + index + ', \'type\', this.value)">' +
         '<option value="electrode"' + (rtype==='electrode'?' selected':'') + '>电极料架</option>' +
+        '<option value="aluminum"' + (rtype==='aluminum'?' selected':'') + '>铝板电极料架</option>' +
         '<option value="tool"' + (rtype==='tool'?' selected':'') + '>刀具料架</option>' +
         '<option value="steel"' + (rtype==='steel'?' selected':'') + '>钢件料架</option>' +
-        '<option value="pallet"' + (rtype==='pallet'?' selected':'') + '>托盘料架</option>' +
       '</select></div>' +
-      '<div class="config-field"><label>料架编号</label><input type="number" class="config-input" value="' + (rack.number || 1) + '" min="1" onchange="updateRack(' + index + ', \'number\', parseInt(this.value))"></div>' +
-      '<div class="config-field"><label>行数</label><input type="number" class="config-input" value="' + (rack.rows || 8) + '" min="1" onchange="updateRack(' + index + ', \'rows\', parseInt(this.value))"></div>' +
-      '<div class="config-field"><label>列数</label><input type="number" class="config-input" value="' + (rack.cols || 10) + '" min="1" onchange="updateRack(' + index + ', \'cols\', parseInt(this.value))"></div>' +
-      '<div class="config-field"><label>光电信号</label><input type="text" class="config-input" value="' + (rack.photoSignal || '') + '" placeholder="DM区地址" onchange="updateRack(' + index + ', \'photoSignal\', this.value)"></div>' +
+      '<div class="config-field"><label>料架编号</label><input type="number" class="config-input" value="' + (rack.number || 1) + '" min="1" onchange="updateRack(' + index + ', \'number\', this.value)"></div>' +
+      '<div class="config-field"><label>行数</label><input type="number" class="config-input" value="' + (rack.rows || 8) + '" min="1" onchange="updateRack(' + index + ', \'rows\', this.value)"></div>' +
+      '<div class="config-field"><label>列数</label><input type="number" class="config-input" value="' + (rack.cols || 10) + '" min="1" onchange="updateRack(' + index + ', \'cols\', this.value)"></div>' +
+      '<div class="config-field"><label>光电开始信号</label><input type="text" class="config-input" value="' + (rack.photoStartSignal || '') + '" placeholder="如：500.00" onchange="updateRack(' + index + ', \'photoStartSignal\', this.value)"></div>' +
+      '<div class="config-field"><label>光电复位信号</label><input type="text" class="config-input" value="' + (rack.photoResetSignal || '') + '" placeholder="如：500.01" onchange="updateRack(' + index + ', \'photoResetSignal\', this.value)"></div>' +
       '<div class="config-field"><label>开门请求信号</label><input type="text" class="config-input" value="' + (rack.openRequest || '') + '" placeholder="如：103.02" onchange="updateRack(' + index + ', \'openRequest\', this.value)"></div>' +
       '<div class="config-field"><label>允许开门信号</label><input type="text" class="config-input" value="' + (rack.openSignal || '') + '" placeholder="软件输出给PLC" onchange="updateRack(' + index + ', \'openSignal\', this.value)"></div>' +
       '<div class="config-field"><label>门状态信号</label><input type="text" class="config-input" value="' + (rack.doorClosed || '') + '" placeholder="如：103.01" onchange="updateRack(' + index + ', \'doorClosed\', this.value)"></div>' +
       '<div class="config-field"><label>门状态标志信号</label><input type="text" class="config-input" value="' + (rack.doorFlag || '') + '" placeholder="脉冲信号地址" onchange="updateRack(' + index + ', \'doorFlag\', this.value)"></div>' +
-      '<div class="config-field"><label>抓取开始任务号</label><input type="text" class="config-input" value="' + (rack.grabStartTaskNo || '') + '" placeholder="如: D100" onchange="updateRack(' + index + ', \'grabStartTaskNo\', this.value)"></div>' +
-      '<div class="config-field"><label>放置开始任务号</label><input type="text" class="config-input" value="' + (rack.placeStartTaskNo || '') + '" placeholder="如: D200" onchange="updateRack(' + index + ', \'placeStartTaskNo\', this.value)"></div>' +
-      '<div class="config-field"><label>扫描开始任务号</label><input type="text" class="config-input" value="' + (rack.scanStartTaskNo || '') + '" placeholder="如: D300" onchange="updateRack(' + index + ', \'scanStartTaskNo\', this.value)"></div>' +
+      '<div class="config-field"><label>抓取开始任务号</label><input type="text" class="config-input" value="' + (rack.grabStartTaskNo || '') + '" placeholder="如: 100" onchange="updateRack(' + index + ', \'grabStartTaskNo\', this.value)"></div>' +
+      '<div class="config-field"><label>放置开始任务号</label><input type="text" class="config-input" value="' + (rack.placeStartTaskNo || '') + '" placeholder="如: 200" onchange="updateRack(' + index + ', \'placeStartTaskNo\', this.value)"></div>' +
+      '<div class="config-field"><label>扫描开始任务号</label><input type="text" class="config-input" value="' + (rack.scanStartTaskNo || '') + '" placeholder="如: 300" onchange="updateRack(' + index + ', \'scanStartTaskNo\', this.value)"></div>' +
       '</div></div>';
   }).join('');
 }
@@ -251,7 +268,8 @@ function renderMachines() {
       siemensFields =
         '<div class="config-field siemens-field"><label>会话URL</label><input type="text" class="config-input" value="' + (m.sessionUrl || '') + '" placeholder="如: opc.tcp://192.168.1.1:4840" onchange="updateMachine(' + index + ', \'sessionUrl\', this.value)"></div>' +
         '<div class="config-field siemens-field"><label>登录用户名</label><input type="text" class="config-input" value="' + (m.username || '') + '" placeholder="OPC UA 用户名" onchange="updateMachine(' + index + ', \'username\', this.value)"></div>' +
-        '<div class="config-field siemens-field"><label>登录密码</label><input type="password" class="config-input" value="' + (m.password || '') + '" placeholder="OPC UA 密码" onchange="updateMachine(' + index + ', \'password\', this.value)"></div>';
+        '<div class="config-field siemens-field"><label>登录密码</label><input type="password" class="config-input" value="' + (m.password || '') + '" placeholder="OPC UA 密码" onchange="updateMachine(' + index + ', \'password\', this.value)"></div>' +
+        '<div class="config-field siemens-field"><label>HostKey</label><input type="text" class="config-input" value="' + (m.hostKey || '') + '" placeholder="如: C:\\keys\\host.pem" onchange="updateMachine(' + index + ', \'hostKey\', this.value)"></div>';
     }
     return '<div class="card-item" data-machine-id="' + m.id + '">' +
       '<div class="card-header"><span class="card-title">' + (m.name || m.type + '-' + m.number) + '</span>' +
@@ -263,6 +281,11 @@ function renderMachines() {
       '<div class="config-field"><label>端口</label><input type="text" class="config-input" value="' + (m.port || '') + '" placeholder="如: 8193" onchange="updateMachine(' + index + ', \'port\', this.value)"></div>' +
       '<div class="config-field"><label>工位数</label><input type="number" class="config-input" value="' + (m.stationCount || 4) + '" min="1" onchange="updateMachine(' + index + ', \'stationCount\', parseInt(this.value))"></div>' +
       '<div class="config-field"><label>NC路径</label><input type="text" class="config-input mc-nc" value="' + (m.ncPath || '') + '" placeholder="NC路径" onchange="updateMachine(' + index + ', \'ncPath\', this.value)"></div>' +
+      '<div class="config-field"><label>抓取开始任务号</label><input type="text" class="config-input" value="' + (m.grabStartTaskNo || '') + '" placeholder="如: 201" onchange="updateMachine(' + index + ', \'grabStartTaskNo\', this.value)"></div>' +
+      '<div class="config-field"><label>放置开始任务号</label><input type="text" class="config-input" value="' + (m.placeStartTaskNo || '') + '" placeholder="如: 202" onchange="updateMachine(' + index + ', \'placeStartTaskNo\', this.value)"></div>' +
+      '<div class="config-field"><label>托盘工位编号</label><input type="number" class="config-input" value="' + (m.palletWorkNum || 1) + '" min="1" placeholder="托盘料架放置工位" onchange="updateMachine(' + index + ', \'palletWorkNum\', this.value)"></div>' +
+      '<div class="config-field"><label>工位坐标系编号</label><input type="text" class="config-input" value="' + (m.workCoords || '') + '" placeholder="如: G54,G55,G56,G57" onchange="updateMachine(' + index + ', \'workCoords\', this.value)"></div>' +
+      '<div class="config-field"><label>启动加工信号</label><input type="text" class="config-input" value="' + (m.startProcessSignal || '') + '" placeholder="如: 105.00" onchange="updateMachine(' + index + ', \'startProcessSignal\', this.value)"></div>' +
       siemensFields +
       '</div></div>';
   }).join('');

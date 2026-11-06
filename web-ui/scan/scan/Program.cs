@@ -15,6 +15,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -43,9 +44,10 @@ namespace scan
         static string RobotEleAddr = "206.00";
 
         // 夹爪配置（从 config.json line/grippers 读取）
-        static string GripperType = "fixed-single";   // fixed-single/fixed-double/quick-electrode/quick-tool/quick-pallet
+        static string GripperType = "";   // fixed-single/fixed-double/quick-electrode/quick-tool/quick-pallet
         static bool IsFixedGripper = true;            // 是否固定爪
         static List<GripperConfig> Grippers = new List<GripperConfig>();
+        static List<RackConfig> Racks = new List<RackConfig>();
 
         class GripperConfig
         {
@@ -58,10 +60,21 @@ namespace scan
             public string PlaceTaskNo;
         }
 
+        class RackConfig
+        {
+            public string Id;
+            public string Type;           // steel/tool/electrode/pallet
+            public string Name;
+            public string Number;
+            public string GrabStartTaskNo;
+            public string PlaceStartTaskNo;
+            public string ScanStartTaskNo;
+        }
+
         // 扫描器配置
-        static string ScannerType = "rfid"; // "rfid" 或 "rcd"
+        static string ScannerType = "rcd"; // "rfid" 或 "rcd"
         static string RfidCom = "COM3";
-        static string RcdIp = "192.168.1.100";
+        static string RcdIp = "192.168.101.71";
         static string RcdPort = "5000";
         static int RcdHeartbeatInterval = 60;
 
@@ -75,10 +88,14 @@ namespace scan
         static bool EmanEnabled = false;
 
         // eman 生产数据查询语句（{0}=监控编号/RFID）
-        static readonly string SqlSteelInfo     = "SELECT * FROM steel_part_info WHERE monitor_no = '{0}'";
-        static readonly string SqlElectrodeInfo = "SELECT * FROM electrode_part_info WHERE monitor_no = '{0}'";
+        static readonly string SqlSteelInfo = "SELECT actualResourceID,operationNameID,ID,mouldName,operationName from Mould INNER JOIN MouldPartTechnics ON Mould.mouldID=MouldPartTechnics.mouldID where MouldPartTechnics.partMnoitorID='{0}' AND operationName='CNC-2'";
+        static readonly string SqlElectrodeInfo = "SELECT MouldPart.verifyID FROM Mould INNER JOIN MouldPart ON Mould.mouldID=MouldPart.mouldID WHERE MouldPart.ID='{0}'";
 
         static plc Plc;
+
+        // 停止标志位：前端停止按钮触发后，后端创建 stop.flag，子程序检测到即终止
+        static readonly string StopFlagFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "stop.flag");
+        static bool IsStopRequested() { return File.Exists(StopFlagFile); }
 
         static void Main(string[] args)
         {
@@ -87,8 +104,8 @@ namespace scan
             try
             {
                 var cfg = ConfigClient.FetchConfig(ApiBase);
-                if (cfg.Count == 0) { LogHelper.Error("获取配置失败"); return; }
-                ExtractConfig(cfg);
+                if (cfg.Count == 0) { LogHelper.Error("获取配置失败，配置来源: " + ConfigClient.LastSourceText); return; }
+                if (!ExtractConfig(cfg)) return;
                 Mysql = CommonFactory.CreateInstance(DbType == "sqlserver" ? CommonData.sql : CommonData.mysql, ConnStr);
 
                 // 连接 PLC
@@ -119,20 +136,33 @@ namespace scan
                 // 3. 循环扫描
                 foreach (int pos in scanList)
                 {
+                    if (IsStopRequested()) { LogHelper.Warn("收到停止信号，终止扫描流程"); return; }
                     LogHelper.Info( "开始扫描料位: " + pos);
 
-                    // 发送扫描任务
-                    if (!Plc.WriteDM(PlcDm, pos))
+                    // 发送扫描任务：任务号 = 料架扫描开始任务号 + 料位
+                    var scanRack = GetRackByType(GetRackType(pos));
+                    int scanStartNo = 400;
+                    if (scanRack != null && !string.IsNullOrEmpty(scanRack.ScanStartTaskNo))
+                        scanStartNo = ParseTaskNoBase(scanRack.ScanStartTaskNo);
+                    if (!Plc.WriteDM(PlcDm, scanStartNo + pos))
                     {
-                        LogHelper.Error( "发送任务失败，料位: " + pos);
+                        LogHelper.Error("发送任务失败，料位: " + pos);
                         continue;
                     }
-                    LogHelper.Info( "发送任务 " + pos + " 成功");
-
+                    LogHelper.Info( "发送任务 "+ pos + " 成功");
+                    // 发送扫描任务
+                    if (!Plc.WriteWR(TaskStartAddr, 1))
+                    {
+                        LogHelper.Error("发送任务开始失败，料位: " + pos);
+                        continue;
+                    }
+                    Thread.Sleep(300);
+                    Plc.WriteWR(TaskStartAddr, 0);
                     // 等待任务完成
                     int waitCount = 0;
                     while (!Plc.ReadWR(TaskFinishAddr) && waitCount < 300)
                     {
+                        if (IsStopRequested()) { LogHelper.Warn("收到停止信号，机器人任务执行失败"); return; }
                         Thread.Sleep(100);
                         waitCount++;
                     }
@@ -175,7 +205,7 @@ namespace scan
                 string fixedWorkpiece = "";
                 try
                 {
-                    using (DataTable dt = Mysql.ExeForDtl("SELECT workpiecename FROM robotmessage LIMIT 1"))
+                    using (DataTable dt = Mysql.ExeForDtl("SELECT workpiecename FROM robotmessage where id =1"))
                         if (dt != null && dt.Rows.Count > 0)
                             fixedWorkpiece = SafeStr(dt.Rows[0]["workpiecename"]);
                 }
@@ -199,12 +229,24 @@ namespace scan
                     return false;
                 }
 
-                if (!Plc.WriteDM(PlcDm, emptySlot))
+                var placeRack = GetRackByType(GetRackType(emptySlot));
+                int placeStartNo = 0;
+                if (placeRack != null && !string.IsNullOrEmpty(placeRack.PlaceStartTaskNo))
+                    placeStartNo = ParseTaskNoBase(placeRack.PlaceStartTaskNo);
+                if (!Plc.WriteDM(PlcDm, placeStartNo + emptySlot))
                 {
                     LogHelper.Error( "发送放置工件任务失败: " + emptySlot);
                     return false;
                 }
+
+                if (!Plc.WriteWR(TaskStartAddr,1))
+                {
+                    LogHelper.Error("发送任务开始失败: " + emptySlot);
+                    return false;
+                }
                 LogHelper.Info( "发送放置工件任务: " + emptySlot);
+                Thread.Sleep(300);
+                Plc.WriteWR(TaskStartAddr, 0);
                 if (!WaitForTaskFinish(300))
                 {
                     LogHelper.Error( "放置工件任务超时");
@@ -215,6 +257,7 @@ namespace scan
                 {
                     Mysql.ExecuteSql("UPDATE rack_administrate SET rfid='" + fixedWorkpiece + "', scanstatus=1, workstate=0, posstatus=2 WHERE id=" + emptySlot);
                     LogHelper.Info( "更新料位 " + emptySlot + " 为有料: " + fixedWorkpiece);
+                    LogHelper.NotifyRackChanged();
                 }
                 catch (Exception ex) { LogHelper.Warn( "更新料架失败: " + ex.Message); }
 
@@ -232,7 +275,7 @@ namespace scan
             string workpieceName = "";
             try
             {
-                using (DataTable dt = Mysql.ExeForDtl("SELECT clampname,clampstatus,clampposstatus,workpiecename FROM robotmessage LIMIT 1"))
+                using (DataTable dt = Mysql.ExeForDtl("SELECT clampname,clampstatus,clampposstatus,workpiecename FROM robotmessage where id =1"))
                 {
                     if (dt != null && dt.Rows.Count > 0)
                     {
@@ -277,8 +320,12 @@ namespace scan
                     return false;
                 }
 
-                // 发送放置工件到料架任务
-                int placeTask = emptySlot + 0; // 任务号 = 料位号
+                // 发送放置工件到料架任务：任务号 = 料架放置开始任务号 + 料位
+                var placeRack2 = GetRackByType(GetRackType(emptySlot));
+                int placeStartNo2 = 0;
+                if (placeRack2 != null && !string.IsNullOrEmpty(placeRack2.PlaceStartTaskNo))
+                    placeStartNo2 = ParseTaskNoBase(placeRack2.PlaceStartTaskNo);
+                int placeTask = placeStartNo2 + emptySlot;
                 if (!Plc.WriteDM(PlcDm, placeTask))
                 {
                     LogHelper.Error( "发送放置工件任务失败: " + placeTask);
@@ -299,6 +346,7 @@ namespace scan
                     string updateRack = "UPDATE rack_administrate SET rfid='" + workpieceName + "', scanstatus=1, workstate=0, posstatus=2 WHERE id=" + emptySlot;
                     Mysql.ExecuteSql(updateRack);
                     LogHelper.Info( "更新料位 " + emptySlot + " 为有料: " + workpieceName);
+                    LogHelper.NotifyRackChanged();
                 }
                 catch (Exception ex) { LogHelper.Warn( "更新料架失败: " + ex.Message); }
 
@@ -321,9 +369,9 @@ namespace scan
             foreach (var g in Grippers)
             {
                 if (string.Equals(g.Type, clampType, StringComparison.OrdinalIgnoreCase) ||
-                    (clampType == "1" && g.Type == "steel") ||
-                    (clampType == "2" && g.Type == "tool") ||
-                    (clampType == "3" && g.Type == "electrode") ||
+                    (clampType == "1" && g.Type == "electrode") ||
+                    (clampType == "2" && g.Type == "steel") ||
+                    (clampType == "3" && g.Type == "tool") ||
                     (clampType == "4" && g.Type == "pallet"))
                 {
                     gripper = g; break;
@@ -331,9 +379,9 @@ namespace scan
             }
             if (gripper == null)
             {
-                LogHelper.Warn( "未找到类型为 " + clampType + " 的夹爪配置，使用第一个");
-                if (Grippers.Count > 0) gripper = Grippers[0];
-                else { LogHelper.Error( "无夹爪配置"); return false; }
+                // 禁止兜底使用第一个夹爪：否则会把当前夹爪放错料位，机器人后续抓取错误
+                LogHelper.Error( "未找到类型为 " + clampType + " 的夹爪配置，无法放置当前夹爪，请人工处理（已配置: " + string.Join(",", Grippers.ConvertAll(x => x.Type + "/" + x.Name).ToArray()) + "）");
+                return false;
             }
 
             LogHelper.Info( "夹爪: " + gripper.Name + " (类型=" + gripper.Type + ", 光电=" + gripper.SlotPhotoSignal + ")");
@@ -354,14 +402,20 @@ namespace scan
             // 发送放置夹爪任务
             if (!string.IsNullOrEmpty(gripper.PlaceTaskNo))
             {
-                // 任务号 = 放置任务号 + 料位号
-                int taskNo = ParseTaskNoBase(gripper.PlaceTaskNo) + (string.IsNullOrEmpty(gripper.Number) ? 0 : int.Parse(gripper.Number));
+                int taskNo = ParseTaskNoBase(gripper.PlaceTaskNo);
                 LogHelper.Info( "发送放置夹爪任务: " + taskNo);
                 if (!Plc.WriteDM(PlcDm, taskNo))
                 {
                     LogHelper.Error( "发送放置夹爪任务失败");
                     return false;
                 }
+                if (!Plc.WriteWR(TaskStartAddr, 1))
+                {
+                    LogHelper.Error("发送任务开始失败");
+                    return false;
+                }
+                Thread.Sleep(300);
+                Plc.WriteWR(TaskStartAddr, 0);
                 if (!WaitForTaskFinish(300))
                 {
                     LogHelper.Error( "放置夹爪任务超时");
@@ -384,6 +438,7 @@ namespace scan
             int waited = 0;
             while (waited < maxTicks)
             {
+                if (IsStopRequested()) { LogHelper.Warn("收到停止信号，机器人任务执行失败"); return false; }
                 if (Plc.ReadWR(TaskFinishAddr)) return true;
                 Thread.Sleep(100);
                 waited++;
@@ -395,7 +450,7 @@ namespace scan
         {
             try
             {
-                using (DataTable dt = Mysql.ExeForDtl("SELECT id FROM rack_administrate WHERE posstatus=1 AND scanstatus=0 LIMIT 1"))
+                using (DataTable dt = Mysql.ExeForDtl("SELECT id FROM rack_administrate WHERE posstatus=1 AND scanstatus=0"))
                 {
                     if (dt != null && dt.Rows.Count > 0)
                         return Convert.ToInt32(dt.Rows[0]["id"]);
@@ -445,6 +500,35 @@ namespace scan
             }
             catch (Exception ex) { LogHelper.Warn( "获取料架类型失败: " + ex.Message); }
             return "steel";
+        }
+
+        /// <summary>
+        /// 从 config.json 读取 eman 数据库配置
+        /// </summary>
+        static void LoadEmanConfig(Dictionary<string, object> cfg)
+        {
+            try
+            {
+                var emanCfg = ConfigClient.GetDict(cfg, "eman");
+                if (emanCfg.Count > 0)
+                {
+                    string emanHost = ConfigClient.GetStr(emanCfg, "host", "");
+                    string emanDbname = ConfigClient.GetStr(emanCfg, "database", "eman");
+                    string emanUser = ConfigClient.GetStr(emanCfg, "user", "sa");
+                    string emanPwd = ConfigClient.GetStr(emanCfg, "password", "");
+                    string emanType = ConfigClient.GetStr(emanCfg, "type", "sqlserver").ToLower();
+                    int emanPort = ConfigClient.GetInt(emanCfg, "port", 1433);
+                    if (emanType == "sqlserver")
+                        EmanConnStr = $"Server={emanHost},{emanPort};Database={emanDbname};User Id={emanUser};Password={emanPwd};";
+                    else
+                        EmanConnStr = $"Server={emanHost};Database={emanDbname};Uid={emanUser};Pwd={emanPwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
+                    EmanEnabled = !string.IsNullOrEmpty(emanHost);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Warn( "读取 eman 数据库配置失败: " + ex.Message);
+            }
         }
 
         /// <summary>
@@ -527,8 +611,8 @@ namespace scan
 
             try
             {
-                // 判定机器人光电信号 - 抓取夹爪成功后更新robotmessage表
-                if (Plc.ReadWR(RobotEleAddr))
+                // 判定机器人光电信号（0=有料，1=无料）
+                if (!Plc.ReadWR(RobotEleAddr))
                 {
                     // 有料，执行扫描
                     if (ScannerType == "rcd")
@@ -546,24 +630,41 @@ namespace scan
                         status = "pending"; // 扫描成功，待加工
                         LogHelper.Info( "识别料位 " + pos + " 扫描结果: " + scanResult);
 
-                        // 判定料架类型，连接 eman 获取生产数据
-                        string rackType = GetRackType(pos);
-                        if (!string.IsNullOrEmpty(rackType))
+                        // 空夹具识别：扫描到的 rfid 含 EMPTY（如 EMPTY1~EMPTY4）即视为空夹具
+                        bool isEmptyFixture = scanResult.IndexOf("EMPTY", StringComparison.OrdinalIgnoreCase) >= 0;
+                        string workpieceVal = "";
+                        if (isEmptyFixture)
                         {
-                            var emanData = QueryEmanProduction(scanResult, rackType);
-                            if (emanData != null)
-                                LogHelper.Info( "获取eman生产数据成功: " + scanResult);
+                            // 空夹具：跳过 eman 检索，workpiecename 与 rfid 保持一致
+                            LogHelper.Info( "识别料位 " + pos + " 为空夹具 " + scanResult + "，跳过 eman 查询");
+                            workpieceVal = scanResult;
+                        }
+                        else
+                        {
+                            // 非空夹具：判定料架类型，连接 eman 获取生产数据
+                            string rackType = GetRackType(pos);
+                            string verifyId = "";
+                            if (!string.IsNullOrEmpty(rackType))
+                            {
+                                var emanData = QueryEmanProduction(scanResult, rackType);
+                                if (emanData != null)
+                                {
+                                    LogHelper.Info( "获取eman生产数据成功: " + scanResult);
+                                    foreach (var kv in emanData)
+                                        if (kv.Key.Equals("verifyID", StringComparison.OrdinalIgnoreCase))
+                                        { verifyId = kv.Value; break; }
+                                }
+                            }
+                            workpieceVal = verifyId;
                         }
 
-                        // 更新料位信息 - 扫描成功
-                        string sql = $"UPDATE rack_administrate SET rfid='{scanResult}', scanstatus=1, workstate=0, posstatus=2 WHERE id={pos}";
+                        // 更新料位信息 - 扫描成功，workpiecename 来自 eman 的 verifyID（空夹具时与 rfid 一致）
+                        string workpieceStr = string.IsNullOrEmpty(workpieceVal) ? "NULL" : "'" + workpieceVal.Replace("'", "''") + "'";
+                        string sql = $"UPDATE rack_administrate SET rfid='{scanResult}', workpiecename={workpieceStr}, scanstatus=1, workstate=0, posstatus=2 WHERE id={pos}";
                         if (!Mysql.ExecuteSql(sql))
                         {
                             LogHelper.Error( "更新料位 " + pos + " 信息失败");
                         }
-
-                        // 抓取夹爪成功后，根据任务号更新robotmessage表
-                        UpdateRobotMessage_GrabClamp(pos);
 
                         // 通知总包程序更新前端UI - 扫描成功
                         NotifyRackUpdate(pos, "steel", status, scanResult, $"料位{pos}扫描成功，RFID:{scanResult}");
@@ -590,7 +691,7 @@ namespace scan
                     scanResult = "";
                     LogHelper.Info( "料位 " + pos + " 无料");
 
-                    string sql = $"UPDATE rack_administrate SET rfid='', verifyid='', scanstatus=1, workstate=0, posstatus=1 WHERE id={pos}";
+                    string sql = $"UPDATE rack_administrate SET rfid='', workpiecename='', scanstatus=1, workstate=0, posstatus=1 WHERE id={pos}";
                     Mysql.ExecuteSql(sql);
 
                     // 通知总包程序更新前端UI - 无料
@@ -646,13 +747,6 @@ namespace scan
             {
                 rcd = new RCD_100(RcdIp, RcdPort, RcdHeartbeatInterval);
 
-                // 订阅消息接收事件
-                rcd.MessageSent += (sender, msg) =>
-                {
-                    receivedData = msg;
-                    resetEvent.Set();
-                };
-
                 // 连接 RCD 扫码枪
                 if (!rcd.Connect())
                 {
@@ -660,14 +754,10 @@ namespace scan
                     return "";
                 }
                 LogHelper.Info( "RCD 扫码枪连接成功");
-
-                // 等待扫码结果，最多等待 5 秒
-                bool gotResult = resetEvent.WaitOne(5000);
-                if (gotResult && !string.IsNullOrEmpty(receivedData) && receivedData != "heartbeat")
-                {
-                    scanResult = receivedData.Trim();
-                }
-                else
+                rcd.MessageSent += rcd.returnMsg;
+                rcd.SendMess("start");
+                scanResult = WaitMsg(rcd);
+                if (string.IsNullOrEmpty(scanResult))
                 {
                     // 重试机制：重新发送心跳触发扫码（最多2次）
                     for (int i = 0; i < 2; i++)
@@ -675,12 +765,11 @@ namespace scan
                         resetEvent.Reset();
                         receivedData = "";
                         rcd.PauseHeart();
-                        rcd.SendMess("scan");
+                        rcd.SendMess("start");
                         rcd.ContinueHeart();
-                        gotResult = resetEvent.WaitOne(3000);
-                        if (gotResult && !string.IsNullOrEmpty(receivedData) && receivedData != "heartbeat")
+                        scanResult = WaitMsg(rcd);
+                        if (!string.IsNullOrEmpty(scanResult) && scanResult != "heartbeat")
                         {
-                            scanResult = receivedData.Trim();
                             break;
                         }
                     }
@@ -699,6 +788,24 @@ namespace scan
             }
 
             return scanResult;
+        }
+
+        /// <summary>
+        /// 等待返回信息
+        /// </summary>
+        /// <returns></returns>
+        static public string WaitMsg(RCD_100 rcd)
+        {
+            DateTime startTime = DateTime.Now;
+            while ((DateTime.Now - startTime).TotalMilliseconds < 3000) // 超时时间设置为1秒
+            {
+                // 读取扫码枪返回的数据
+                if (!string.IsNullOrEmpty(rcd.DJId))
+                {
+                    break;
+                }
+            }
+            return rcd.DJId;
         }
 
         #region RobotMessage表更新方法
@@ -728,37 +835,6 @@ namespace scan
                 else
                 {
                     LogHelper.Error( "更新robotmessage表失败 - 置换夹爪");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogHelper.Error( "更新robotmessage表异常: " + ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// 更新robotmessage表 - 抓取夹爪成功后
-        /// 根据任务号更新clampname为相应夹爪名称，clampposstatus为1（有夹爪），workpiecename为空，workpiecestatus为0（无工件）
-        /// </summary>
-        /// <param name="taskId">任务号/料位号</param>
-        static void UpdateRobotMessage_GrabClamp(int taskId)
-        {
-            try
-            {
-                // 抓取夹爪成功后，保持夹爪名称不变，夹爪状态为有夹爪
-                string sql = UpsertSql("robotmessage",
-                    "id, clampposstatus, workpiecename, workpiecestatus",
-                    $"{taskId}, 1, NULL, 0",
-                    "clampposstatus = 1, workpiecename = NULL, workpiecestatus = 0",
-                    "id", taskId.ToString());
-
-                if (Mysql.ExecuteSql(sql))
-                {
-                    LogHelper.Info( $"更新robotmessage表成功 - 抓取夹爪: taskId={taskId}, clampposstatus=1, workpiecestatus=0");
-                }
-                else
-                {
-                    LogHelper.Error( "更新robotmessage表失败 - 抓取夹爪");
                 }
             }
             catch (Exception ex)
@@ -830,11 +906,11 @@ ON DUPLICATE KEY UPDATE {updateSet}";
         /// <param name="rfid">RFID编号</param>
         /// <param name="message">消息</param>
         
-        static void ExtractConfig(Dictionary<string, object> cfg)
+        static bool ExtractConfig(Dictionary<string, object> cfg)
         {
             try
             {
-                if (cfg == null || cfg.Count == 0) return;
+                if (cfg == null || cfg.Count == 0) return false;
                 var db = ConfigClient.GetDict(cfg, "database");
                 string host = ConfigClient.GetStr(db, "host", "localhost");
                 string dbname = ConfigClient.GetStr(db, "database", "qianduantest");
@@ -851,6 +927,9 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                     ConnStr = $"Server={host};Database={dbname};Uid={user};Pwd={pwd};CharacterSet=utf8mb4;SslMode=None;AllowPublicKeyRetrieval=True;ConnectionReset=False;";
                 }
 
+                // eman 数据库（生产数据）
+                LoadEmanConfig(cfg);
+
                 var plcCfg = ConfigClient.GetDict(cfg, "plc");
                 if (plcCfg.Count > 0)
                 {
@@ -863,6 +942,8 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                         TaskStartAddr = ConfigClient.GetStr(robotSig, "taskStart", "");
                         TaskFinishAddr = ConfigClient.GetStr(robotSig, "taskDone", "");
                         RobotEleAddr = ConfigClient.GetStr(robotSig, "photo", "");
+                        string taskNoStr = ConfigClient.GetStr(robotSig, "taskNumber", "D100");
+                        int.TryParse(taskNoStr.Replace("D", "").Replace("DM", "").Trim(), out PlcDm);
                     }
                     var machineSig = ConfigClient.GetDict(signals, "machine");
                     if (machineSig.Count > 0)
@@ -879,10 +960,26 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                 }
 
                 var line = ConfigClient.GetDict(cfg, "line");
-                if (line.Count > 0)
+                // 夹爪类型决定后续用哪套任务号 / 哪组夹爪对象，取不到时必须终止：
+                // 旧逻辑用 "fixed-single" 兜底，电极线一旦读不到配置就会静默用钢件夹爪抓料，日志查不出原因。
+                GripperType = ConfigClient.GetStr(line, "gripperType", "").Trim();
+                if (string.IsNullOrEmpty(GripperType))
                 {
-                    GripperType = ConfigClient.GetStr(line, "gripperType", "fixed-single");
-                    IsFixedGripper = GripperType == "fixed-single" || GripperType == "fixed-double";
+                    LogHelper.Error("配置缺少 line.gripperType，无法判定夹爪类型，拒绝以默认值继续运行。配置来源: "
+                        + ConfigClient.LastSourceText);
+                    return false;
+                }
+                LogHelper.Info("夹爪类型: " + GripperType + "（配置来源: " + ConfigClient.LastSourceText + "）");
+                IsFixedGripper = GripperType == "fixed-single" || GripperType == "fixed-double";
+
+                var scanner = ConfigClient.GetDict(cfg, "scanner");
+                if (scanner.Count > 0)
+                {
+                    ScannerType = ConfigClient.GetStr(scanner, "type", "rcd").ToLower();
+                    RfidCom = ConfigClient.GetStr(scanner, "rfidCom", "COM3");
+                    RcdIp = ConfigClient.GetStr(scanner, "rcdIp", "192.168.101.71");
+                    RcdPort = ConfigClient.GetStr(scanner, "rcdPort", "5000");
+                    RcdHeartbeatInterval = ConfigClient.GetInt(scanner, "heartbeatInterval", 60);
                 }
 
                 Grippers.Clear();
@@ -894,49 +991,66 @@ ON DUPLICATE KEY UPDATE {updateSet}";
                     else if (glist is object[] arr)
                         foreach (var item in arr) AddGripper(item);
                 }
+
+                LoadRacks(cfg);
             }
             catch (Exception ex)
             {
-                LogHelper.Warn("提取配置失败，使用默认配置: " + ex.Message);
+                LogHelper.Error("提取配置失败，终止运行（不再使用默认配置兜底）: " + ex.Message);
+                return false;
             }
+            return true;
         }
 
-
-        static void AddGripper(object item) { var g = item as Dictionary<string,object>; if (g==null) return; Grippers.Add(new GripperConfig{Id=ConfigClient.GetStr(g,"id",""),Type=ConfigClient.GetStr(g,"type","steel"),Name=ConfigClient.GetStr(g,"name",""),Number=ConfigClient.GetStr(g,"number",""),SlotPhotoSignal=ConfigClient.GetStr(g,"slotPhotoSignal",""),GrabTaskNo=ConfigClient.GetStr(g,"grabTaskNo",""),PlaceTaskNo=ConfigClient.GetStr(g,"placeTaskNo","")}); }
-
-static void NotifyRackUpdate(int position, string rackType, string status, string rfid, string message)
+        static void LoadRacks(Dictionary<string, object> cfg)
         {
             try
             {
-                var data = new
+                Racks.Clear();
+                if (cfg == null || !cfg.ContainsKey("racks") || cfg["racks"] == null) return;
+                var racksRaw = cfg["racks"];
+                if (racksRaw is System.Collections.ArrayList al)
                 {
-                    position = position,
-                    rackType = rackType,
-                    status = status,
-                    rfid = rfid,
-                    message = message
-                };
-
-                string body = Js.Serialize(data);
-                byte[] bytes = Encoding.UTF8.GetBytes(body);
-
-                var req = WebRequest.CreateHttp(ApiBase + "/api/rack/update");
-                req.Method = "POST";
-                req.ContentType = "application/json";
-                req.Timeout = 3000;
-
-                using (var rs = req.GetRequestStream())
-                    rs.Write(bytes, 0, bytes.Length);
-
-                using (var resp = req.GetResponse())
+                    foreach (var it in al)
+                        if (it is Dictionary<string, object> rk) Racks.Add(ParseRack(rk));
+                }
+                else if (racksRaw is object[] arr)
                 {
-                    LogHelper.Info( $"UI更新通知已发送: 料位{position}, 状态{status}");
+                    foreach (var it in arr)
+                        if (it is Dictionary<string, object> rk) Racks.Add(ParseRack(rk));
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) { LogHelper.Warn("加载料架配置失败: " + ex.Message); }
+        }
+
+        static RackConfig ParseRack(Dictionary<string, object> r)
+        {
+            return new RackConfig
             {
-                LogHelper.Warn( "UI更新通知发送失败: " + ex.Message);
-            }
+                Id = ConfigClient.GetStr(r, "id", ""),
+                Type = ConfigClient.GetStr(r, "type", "steel"),
+                Name = ConfigClient.GetStr(r, "name", ""),
+                Number = ConfigClient.GetStr(r, "number", ""),
+                GrabStartTaskNo = ConfigClient.GetStr(r, "grabStartTaskNo", ""),
+                PlaceStartTaskNo = ConfigClient.GetStr(r, "placeStartTaskNo", ""),
+                ScanStartTaskNo = ConfigClient.GetStr(r, "scanStartTaskNo", "")
+            };
+        }
+
+        static RackConfig GetRackByType(string rackType)
+        {
+            foreach (var r in Racks)
+                if (string.Equals(r.Type, rackType, StringComparison.OrdinalIgnoreCase)) return r;
+            return Racks.Count > 0 ? Racks[0] : null;
+        }
+
+        static void AddGripper(object item) { var g = item as Dictionary<string,object>; if (g==null) return; Grippers.Add(new GripperConfig{Id=ConfigClient.GetStr(g,"id",""),Type=ConfigClient.GetStr(g,"type","steel"),Name=ConfigClient.GetStr(g,"name",""),Number=ConfigClient.GetStr(g,"number",""),SlotPhotoSignal=ConfigClient.GetStr(g,"slotPhotoSignal",""),GrabTaskNo=ConfigClient.GetStr(g,"grabTaskNo",""),PlaceTaskNo=ConfigClient.GetStr(g,"placeTaskNo","")}); }
+
+        static void NotifyRackUpdate(int position, string rackType, string status, string rfid, string message)
+        {
+            LogHelper.Info("UI更新通知: 料位" + position + ", 状态" + status + ", " + message);
+            // 通知主控程序递增料架数据版本号，主控程序向前端推送更新
+            LogHelper.NotifyRackChanged();
         }
 
         static string SafeStr(object val) => val == null || val == DBNull.Value ? "" : val.ToString();

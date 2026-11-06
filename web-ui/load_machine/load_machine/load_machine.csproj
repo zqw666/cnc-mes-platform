@@ -8,7 +8,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>load_machine</RootNamespace>
     <AssemblyName>load_machine</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
@@ -18,7 +18,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\backend\bin\Any CPU\Debug\net48\subs\</OutputPath>
+    <OutputPath>..\..\backend\bin\Any CPU\Debug\net472\subs\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -40,7 +40,10 @@
       <HintPath>..\..\lib\DataCommonOperate.dll</HintPath>
     </Reference>
     <Reference Include="PLC">
-      <HintPath>..\..\PLC\PLC\bin\Debug\PLC.dll</HintPath>
+      <HintPath>..\..\lib\PLC.dll</HintPath>
+    </Reference>
+    <Reference Include="ProgramDeal">
+      <HintPath>..\..\..\ProgramDeal\ProgramDeal\bin\Debug\ProgramDeal.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />

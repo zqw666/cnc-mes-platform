@@ -226,9 +226,9 @@ namespace unload_machine
             {
                 bool flag = rodersserver.Machines[macindex - 1].LastReport.Active;
                 if (flag)
-                    status = "runing";
+                    status = "加工中";
                 else
-                    status = "reset";
+                    status = "待机";
             }
             catch
             {
