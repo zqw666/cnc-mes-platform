@@ -41,10 +41,10 @@ namespace MacCommunicate
             switch(state.run)
             {
                 case 1:
-                    status = "runing";
+                    status = "加工中";
                     break;
                 case -1:
-                    status = "reset";
+                    status = "待机";
                     break;
             }
             return status;
@@ -92,6 +92,16 @@ namespace MacCommunicate
         public bool closeDoor(int macindex)
         {
             return true; // fanuc暂未实现
+        }
+
+        /// <summary>
+        /// 上传程序到机床
+        /// </summary>
+        /// <param name="localPath">本地程序文件完整路径</param>
+        /// <param name="remotePath">机床内目标文件夹路径</param>
+        public bool uploadprogram(string localPath, string remotePath)
+        {
+            return false; // fanuc暂未实现
         }
     }
 }

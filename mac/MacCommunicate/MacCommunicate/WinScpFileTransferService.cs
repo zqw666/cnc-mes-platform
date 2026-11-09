@@ -27,7 +27,7 @@ namespace MacCommunicate
             _hostName = hostName ?? throw new ArgumentNullException(nameof(hostName));
             _userName = userName ?? "user";
             _password = password ?? "CUSTOMER";
-            _hostKeyFingerprint = hostKeyFingerprint ?? throw new ArgumentNullException(nameof(hostKeyFingerprint));
+            _hostKeyFingerprint = hostKeyFingerprint ?? "";
             _port = port;
         }
 

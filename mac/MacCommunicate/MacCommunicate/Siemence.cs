@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -42,38 +42,42 @@ namespace MacCommunicate
         /// <returns></returns>
         public string GetMacStatus()
         {
-            string status = null;
-            if (operate == null)
-                return "未连接";
-            Siemensoperate.MachineStatus macstatus = operate.Status;
-            int Status = macstatus.Stus;
-            switch(Status)
+            try
             {
-                case 0:
-                    status = "未连接";
-                    break;
-                case 1:
-                    status = "中断";
-                    break;
-                case 2:
-                    status = "停止";
-                    break;
-                case 3:
-                    status = "运行";
-                    break;
-                case 4:
-                    status = "等待";
-                    break;
-                case 5:
-                    status = "完成";
-                    break;
-                case -1:
-                    status = "连接失败";
-                    break;
+                // 懒创建：不依赖预先 ConnectMac()，纯 OPC UA 直连读取（参考 OpcUaMachineTester）
+                if (operate == null)
+                    operate = new Siemensoperate(_macip, _username, _password, _winscpKey, _sessionUrl);
+                Dictionary<string, string> vals = operate.ReadMany("/Channel/State/progStatus");
+                string prog = GetNodeValue(vals, "/Channel/State/progStatus");
+                if (string.IsNullOrEmpty(prog))
+                    return "未连接";
+                // 只用 prog 判定状态；prog 为 4、5 均视为待机
+                switch (prog)
+                {
+                    case "1": return "中断";
+                    case "2": return "停止";
+                    case "3": return "运行";
+                    case "4": return "待机";
+                    case "5": return "待机";
+                    default: return "未知";
+                }
             }
-            return status;
+            catch
+            {
+                return "未连接";
+            }
         }
 
+        /// <summary>
+        /// 从批量读取结果中取节点值
+        /// </summary>
+        private static string GetNodeValue(Dictionary<string, string> vals, string key)
+        {
+            string v;
+            if (vals != null && vals.TryGetValue(key, out v))
+                return v == null ? "" : v.Trim();
+            return "";
+        }
         /// <summary>
         /// 启动机床加工
         /// </summary>
@@ -116,6 +120,31 @@ namespace MacCommunicate
         public bool closeDoor(int macindex)
         {
             return true; // siemense暂未实现
+        }
+
+        /// <summary>
+        /// 上传程序到机床（调用 Siemensoperate.UploadProgram）
+        /// </summary>
+        /// <param name="localPath">本地程序文件完整路径</param>
+        /// <param name="remotePath">机床内目标文件夹路径，如 /card/user/sinumerik/data/mnt/usercf/</param>
+        /// <returns></returns>
+        public bool uploadprogram(string localPath, string remotePath)
+        {
+            try
+            {
+                if (operate == null)
+                    operate = new Siemensoperate(_macip, _username, _password, _winscpKey, _sessionUrl);
+                // 使用文件传输服务（WinSCP/SCP）连接机床并传输程序
+                if (!operate.ConnectFileTransfer())
+                    return false;
+                // 上传前先删除机床上的旧程序文件（目标文件可能不存在，删除失败不影响后续上传）
+                operate.DeleteProgram(remotePath);
+                return operate.UploadProgram(localPath, remotePath);
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

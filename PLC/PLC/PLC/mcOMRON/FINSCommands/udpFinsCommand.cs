@@ -119,6 +119,31 @@ namespace mcOMRON
         {
             this._transport.SetTCPParams(ip, port);
             this.DA1 = Convert.ToByte(ip.ToString().Split('.')[3]);
+            IPAddress[] adresslist = Dns.GetHostAddresses(Dns.GetHostName());//获取本机的ip地址集合（包括IPV4\IPV6）
+            if (adresslist.Length < 1)
+            {
+                return;
+            }
+            IPAddress pcip = null;
+            foreach (IPAddress IP in adresslist)
+            {
+                if (IP.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    pcip = IP;
+                    if (IP.GetAddressBytes()[0] == ip.GetAddressBytes()[0]
+                        && IP.GetAddressBytes()[1] == ip.GetAddressBytes()[1]
+                        && IP.GetAddressBytes()[2] == ip.GetAddressBytes()[2])
+                    {
+                        break;
+                    }
+                }
+
+            }
+            if (pcip == null)
+            {
+                throw new Exception("No IPv4 address found for local host.");
+            }
+            this.SA1 = Convert.ToByte(pcip.ToString().Split('.')[3]);
         }
 
         #endregion

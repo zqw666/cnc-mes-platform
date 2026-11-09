@@ -77,7 +77,7 @@
   <div class="sub">MachineMonitor · 流程编排与配置化改造 · 22 个工作日每日话术</div>
   <div class="meta">
     <span><b>周期</b>　按 30 天自然月计，只列 22 个工作日，周末不单列</span>
-    <span><b>口径</b>　混合：前 12 天已落地、后 10 天为真实待办；总量均摊到 22 天</span>
+    <span><b>口径</b>　混合：前 3 天已落地、后 19 天为真实待办；总量均摊到 22 天</span>
     <span><b>组织方式</b>　按一个工程师的推进顺序编排：由底向上、每层三拍、风险最高放最后</span>
     <span><b>格式</b>　每天一句大白话，右边那列不用念</span>
     <span><b>范围</b>　仅汇报表，不改动项目代码与文档</span>
@@ -90,8 +90,8 @@
   <p class="desc">状态列必须保留：前段写「已完成」，后段写「待办」。时态不能混用。被问「为什么这么排」翻第 1 节，被问「为什么做了三个页面」翻第 4 节。</p>
   <table>
     <tr><th style="width:110px">项</th><th>说明</th></tr>
-    <tr><td>已落地</td><td>D01–D12。每天对应一个真实完成的模块或交付物，左列用「完成 / 验证 / 输出」。</td></tr>
-    <tr><td>待办</td><td>D13–D22。每天对应一个确实还没做的事项，左列用「计划 / 安排 / 推进 / 核对」，不得写成已完成。</td></tr>
+    <tr><td>已落地</td><td>D01–D03。每天对应一个真实完成的模块或交付物，左列用「完成 / 验证 / 输出」。</td></tr>
+    <tr><td>待办</td><td>D04–D22。每天对应一个确实还没做的事项，左列用「计划 / 安排 / 推进 / 核对」，不得写成已完成。</td></tr>
     <tr><td>平均口径</td><td>每天仍是 <b>2 件事</b>、22 天共 44 件，只是不再编号、不写术语，改成能开口说的白话；累计进度按 100/22 折算，每工作日约 <b>4.5%</b>。状态分段保持不变。</td></tr>
     <tr><td>两列分工</td><td>左列照着念就行，两句话说清做了什么、试过没、明天干啥；右列别念，被追问时用来支撑，指向具体文件、接口或验证结论。</td></tr>
     <tr><td>统一句式</td><td><b>今天把…弄好了，顺手把…也试了一遍，没问题。明天接着弄…</b> 两句大白话，每天长度接近；待办日把「弄好了」换成「打算把…过一遍」。</td></tr>
@@ -100,7 +100,7 @@
   </table>
   <div class="callout co-warn">
     <span class="t">混合口径唯一的风险点</span>
-    前 12 天是倒推的已完成工作，后 10 天是真实计划。两者必须在状态列显式区分，且不能出现「第 13 天完成了第 5 天产出的验证」这类自相矛盾的时间线。周报按周汇总时，同样要标注本周哪些是完成、哪些是安排。
+    前 3 天是已完成工作，后 19 天是真实计划。两者必须在状态列显式区分，且不能出现「第 13 天完成了第 5 天产出的验证」这类自相矛盾的时间线。周报按周汇总时，同样要标注本周哪些是完成、哪些是安排。
   </div>
 </section>
 
@@ -178,33 +178,33 @@
     <tr><td class="c">D03</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">13.6%</td>
       <td class="lead">今天把流程配置的读法改了，能按不同模板找不同文件；顺手给模板名加了限制，乱填中文或者带路径的都不让过。老配置也自动搬了过去，原文件没删，随时能退回来。明天做模板的增删改。</td>
       <td>AppState.cs 路径族；IsValidFlowName 限 [A-Za-z0-9_-]{1,32}</td></tr>
-    <tr><td class="c">D04</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">18.2%</td>
-      <td class="lead">今天把多套流程的增删、改名、切换都做完了。还加了个小设计：新建空白流程默认全是停用的、并且强制仿真，免得手一抖直接跑真机。切过的那份重启后也能记住。明天补安全保护。</td>
-      <td>FlowTemplateService.cs 13 KB；FlowConfig.ToJson 会丢未知字段</td></tr>
-    <tr><td class="c">D05</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">22.7%</td>
-      <td class="lead">今天给模板加了保护：产线正跑着不让改、正在用的那份不让删、删到只剩一份也不让删。然后拿中文名、带路径的名字、重名这些挨个试了一遍，都挡住了。明天把界面接上。</td>
-      <td>WorkflowRunning 判断；异常名全部被拒</td></tr>
-    <tr><td class="c">D06</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">27.3%</td>
-      <td class="lead">今天把编排界面定了形：先拿表格版确认数据能读出来，又试了组件库那版发现不灵，最后改成左中右三栏的设计器。顶上顺手加了模板下拉和管理弹窗，点一下就能切。迁移、各份互不干扰、重启还记得，都试过了。明天开始弄环节定义。</td>
-      <td>三版并存于 <code>frontend/lowcode/</code>（前两版在 <code>_proto/</code>，构建时排除）；弹窗 DOM 须在 script 之前，否则 bind 时元素不存在</td></tr>
-    <tr><td class="c">D07</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">31.8%</td>
-      <td class="lead">今天把环节库从页面里搬到了一个配置文件里，四个分组、十四个环节都归它管。属性面板也不用写死字段了，填什么类型就自动出什么输入框，以后加类型也省事。明天做编辑页面。</td>
-      <td>node-types.json；renderer.js 234 行原生 JS，5 种类型</td></tr>
-    <tr><td class="c">D08</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">36.4%</td>
-      <td class="lead">今天做了环节定义的编辑页，左边树右边表单，改完点保存就行。加了几个检查：名字不能重复、字段不能跟通用的撞名、下拉选项得填全，都能拦住。还留了个直接改原文的口子。明天解决一个编译覆盖的坑。</td>
+    <tr><td class="c">D04</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">18.2%</td>
+      <td class="lead">今天打算把多套流程的增删、改名、切换做出来。还想加个小设计：新建空白流程默认全是停用的、并且强制仿真，免得手一抖直接跑真机。切过的那份重启后也要能记住。明天补安全保护。</td>
+      <td>FlowTemplateService.cs；FlowConfig.ToJson 需保留未知字段</td></tr>
+    <tr><td class="c">D05</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">22.7%</td>
+      <td class="lead">今天准备给模板加保护：产线正跑着不让改、正在用的那份不让删、删到只剩一份也不让删。中文名、带路径的名字、重名这些都要逐一试过。明天把界面接上。</td>
+      <td>WorkflowRunning 判断；异常名需全部拒绝</td></tr>
+    <tr><td class="c">D06</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">27.3%</td>
+      <td class="lead">今天准备把编排界面定形：先拿表格版确认数据能不能读出来，再试组件库那版，最后按左中右三栏做成设计器。顶上要加模板下拉和管理弹窗，点一下就能切。迁移、各份互不干扰、重启还记得，这几项都要验。明天开始弄环节定义。</td>
+      <td>三版原型放 <code>frontend/lowcode/</code>（前两版在 <code>_proto/</code>，构建时排除）；弹窗 DOM 须在 script 之前，否则 bind 时元素不存在</td></tr>
+    <tr><td class="c">D07</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">31.8%</td>
+      <td class="lead">今天打算把环节库从页面里搬到一个配置文件里，四个分组、十四个环节都归它管。属性面板也不写死字段，填什么类型就自动出什么输入框，以后加类型也省事。明天做编辑页面。</td>
+      <td>node-types.json；renderer.js 用原生 JS，5 种类型</td></tr>
+    <tr><td class="c">D08</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">36.4%</td>
+      <td class="lead">今天准备做环节定义的编辑页，左边树右边表单，改完点保存就行。要加几个检查：名字不能重复、字段不能跟通用的撞名、下拉选项得填全。还留个直接改原文的口子。明天解决一个编译覆盖的坑。</td>
       <td>字段名不得与通用字段重名；JSON 入口先 JSON.parse</td></tr>
-    <tr><td class="c">D09</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">40.9%</td>
-      <td class="lead">今天发现个坑：页面上改的东西，一编译就被老文件盖回去了。改成保存时连源码那边也一起写，试了一下两边都对得上，恢复回去也没问题。明天转到设备参数。</td>
+    <tr><td class="c">D09</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">40.9%</td>
+      <td class="lead">今天要排掉一个坑：页面上改的东西，一编译可能被老文件盖回去。保存时得连源码那边一起写，两边对得上、恢复回去也不出问题才算过。明天转到设备参数。</td>
       <td>FindSourcePath()；csproj 的 CopyFrontend / PreserveNewest 会覆盖运行时文件</td></tr>
-    <tr><td class="c">D10</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">45.5%</td>
-      <td class="lead">今天把设备参数的配置页做出来了，PLC、机床、料架、夹爪这些分了十一类，都在页面上填。顺手加了格式检查，IP 写错、地址填重了都会提示。明天把保存这块打通。</td>
+    <tr><td class="c">D10</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">45.5%</td>
+      <td class="lead">今天准备把设备参数的配置页做出来，PLC、机床、料架、夹爪这些分十一类，都在页面上填。要带格式检查，IP 写错、地址填重了都得提示。明天把保存这块打通。</td>
       <td>config-schema.js 用 .js 不用 .json，防 /config.json 明文密码可下载</td></tr>
-    <tr><td class="c">D11</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">50.0%</td>
-      <td class="lead">今天修了个老毛病：以前保存参数会悄悄丢掉几个字段，现在改成原样存，存之前还备份一份。存完前后比对完全一样，另一份配置也不会被误覆盖。明天处理夹爪那个隐患。</td>
-      <td>POST /api/config/raw-save；Python a==b 为 True</td></tr>
-    <tr><td class="c">D12</td><td class="c"><span class="tag t-done">已完成</span></td><td class="c">54.5%</td>
-      <td class="lead">今天把夹爪用错的问题根治了。以前配置读不到就默认拿钢件夹爪去抓电极，还不报错；现在读不到直接停下来，日志里也能看清配置是从哪来的。顺手把部署脚本改对、三份说明文档也出了。下周开始人工点一遍页面。</td>
-      <td>4 场景实跑通过；硬件文档 9 章 10 表</td></tr>
+    <tr><td class="c">D11</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">50.0%</td>
+      <td class="lead">今天要修个老毛病：以前保存参数会悄悄丢掉几个字段，得改成原样存，存之前还备份一份。存完前后比对要完全一样，另一份配置也不能被误覆盖。明天处理夹爪那个隐患。</td>
+      <td>POST /api/config/raw-save；存盘前后需逐字段比对一致</td></tr>
+    <tr><td class="c">D12</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">54.5%</td>
+      <td class="lead">今天打算把夹爪用错的问题治掉。以前配置读不到就默认拿钢件夹爪去抓电极，还不报错；要改成读不到直接停下来，日志里能看清配置是从哪来的。顺手把部署脚本改对、三份说明文档补齐。下周开始人工点一遍页面。</td>
+      <td>需覆盖 4 个场景；硬件文档 9 章 10 表</td></tr>
     <tr><td class="c">D13</td><td class="c"><span class="tag t-plan">待办</span></td><td class="c">59.1%</td>
       <td class="lead">今天打算把流程设计器点一遍：切模板、新建、改名、删除、环节开关，都亲手试试。之前只验过接口，页面上到底顺不顺还没人点过。明天点环节定义页。</td>
       <td>此前仅接口级验证，headless 无法访问 127.0.0.1:8888</td></tr>
@@ -276,7 +276,7 @@
     <tr><td>已完成日</td><td>「今天把 {事儿} 弄好了，顺手 {试了一下}，没问题。明天接着 {下一件}。」两句口语，合计 45–60 字。</td></tr>
     <tr><td>待办日</td><td>「今天打算把 {事儿} 过一遍，顺便看看 {核对点}。明天再弄 {下一件}。」句式跟已完成日一样，只换动词；不得写成已经做完。</td></tr>
     <tr><td>累计进度</td><td>每工作日约 4.5%，D01 起 4.5%、D11 为 50.0%、D22 为 100%。周报按「本周累计到 X%」表述，不要按主观感觉报百分比。</td></tr>
-    <tr><td>被问「做完了吗」</td><td>就说「模板切换弄好了，搬家、各份互不干扰、重启还记得、乱填名字都试过了」。别说「全部上线」。</td></tr>
+    <tr><td>被问「做完了吗」</td><td>就说「流程配置的读法改好了：能按模板找不同文件、名字乱填会被拦住、老配置自动搬过去还能退回来，都试过了」。别说「全部上线」。</td></tr>
     <tr><td>被问「有什么价值」</td><td>说两件事就够了：以后改超时、改参数不用再找我们，工艺自己就能在页面上改；出了事也能查清当时用的是哪份配置。别说「能替代开发」。</td></tr>
     <tr><td>被问「还差什么」</td><td>照最后一天那张单子说：页面还没人工点过、几份文档说法要对一对、这轮改动还没提交、部署脚本还没真跑过。</td></tr>
     <tr><td>被问「顺序怎么排的」</td><td>照第 1 节那段话念：先花两天摸现状（副本太多，得先确认改哪份生效）→ 按流程、环节、参数三层往上做，每层先通数据、再做界面、最后补校验 → 三层做完才动子程序（要停机）→ 最后留十天点页面。</td></tr>
@@ -323,7 +323,7 @@
   </ul>
   <div class="callout co-ok">
     <span class="t">一句话收口</span>
-    这个月说白了干了四件事：把配置收成三个文件、做了三个能改配置的页面、把夹爪用错的老毛病治了、出了三份说明文档。真正有用的不是少写代码，是以后调参数不用老找我们、出了问题能查到当时用的哪份配置。后十天就是把没点过的页面点一遍、文档说法对齐、代码提交一下、部署脚本真跑一次。
+    这个月要做四件事：把配置收成三个文件、做三个能改配置的页面、把夹爪用错的老毛病治掉、出三份说明文档。真正有用的不是少写代码，是以后调参数不用老找我们、出了问题能查到当时用的哪份配置。眼下流程这层刚起了个头，后面十九天按流程、环节、参数往上推，最后十天把页面点一遍、文档说法对齐、代码提交一下、部署脚本真跑一次。
   </div>
 </section>
 

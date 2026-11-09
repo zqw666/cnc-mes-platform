@@ -78,6 +78,7 @@ namespace mcOMRON
 			//
 			this._socket = new Socket(_endPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
 			this._socket.SendTimeout = this._timeout;
+			this._socket.ReceiveTimeout = this._timeout;
 
 			// try to connect
 			//
@@ -94,14 +95,18 @@ namespace mcOMRON
 		/// <returns></returns>
 		public void Close()
 		{
-			if (this._socket == null) return;
-			if (this.Connected)
+			try
 			{
-				this._socket.Disconnect(false);
-				this._socket.Close();
+				if (this._socket == null) return;
+				if (this.Connected)
+				{
+					try { this._socket.Disconnect(false); } catch { }
+				}
+				try { this._socket.Close(); } catch { }
+				try { this._socket.Dispose(); } catch { }
+				this._socket = null;
 			}
-			this._socket.Dispose();
-			this._socket = null;
+			catch { }
 		}
 		
 		#endregion

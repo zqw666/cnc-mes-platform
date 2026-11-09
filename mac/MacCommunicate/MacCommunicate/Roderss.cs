@@ -133,9 +133,9 @@ namespace MacCommunicate
             {
                 // 解析机床状态
                 if (sr.Active)
-                    _lastStatus = "runing";
+                    _lastStatus = "加工中";
                 else
-                    _lastStatus = "reset";
+                    _lastStatus = "待机";
             }
             catch (Exception ex)
             {
@@ -264,7 +264,7 @@ namespace MacCommunicate
         /// <summary>
         /// 获取机床状态
         /// </summary>
-        /// <returns>runing=加工中, reset=待机/复位, null=未知</returns>
+        /// <returns>加工中 / 待机 / null=未知</returns>
         public string GetMacStatus()
         {
             try
@@ -272,7 +272,7 @@ namespace MacCommunicate
                 Roders machine = GetMachine();
                 if (machine != null && machine.LastReport != null)
                 {
-                    return machine.LastReport.Active ? "runing" : "reset";
+                    return machine.LastReport.Active ? "加工中" : "待机";
                 }
                 return _lastStatus;
             }
@@ -469,6 +469,16 @@ namespace MacCommunicate
                 Write_Msg(_macip, "关门异常：" + ex.Message);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// 上传程序到机床
+        /// </summary>
+        /// <param name="localPath">本地程序文件完整路径</param>
+        /// <param name="remotePath">机床内目标文件夹路径</param>
+        public bool uploadprogram(string localPath, string remotePath)
+        {
+            return false; // roders暂未实现
         }
 
         /// <summary>

@@ -24,6 +24,7 @@ namespace Rcd
         private bool isConnect = false;
         private string Ip = string.Empty;
         private string Port = string.Empty;
+        public string DJId = string.Empty;//电极编号
 
         #region 事件
         public event EventHandler<string> MessageSent;//返回信息到测试界面
@@ -45,26 +46,6 @@ namespace Rcd
             heartbeatInterval = heartbeatIntervalInSeconds * 1000;
             this.Ip = ip;
             this.Port = port;
-        }
-        /// <summary>
-        /// 返回信息到测试界面
-        /// </summary>
-        /// <param name="mess"></param>
-        public void SenMessageToWinForm(string mess)
-        {
-            //触发事件，将消息发送给订阅者
-            MessageSent?.Invoke(this, mess);
-        }
-
-        /// <summary>
-        /// 返回客户端信息到测试界面
-        /// </summary>
-        /// <param name="mess"></param>
-        /// <param name="function"></param>
-        public void SenClientMessageToWinForm(string mess, string function)
-        {
-            //触发事件，将消息发送给订阅者
-            SentClientMess?.Invoke(this, new ReturnClientMess { Mess = mess, Function = function });
         }
 
         /// <summary>
@@ -108,10 +89,10 @@ namespace Rcd
         {
             while (!token.IsCancellationRequested)
             {
-                m.WaitOne();
                 try
                 {
-                    if (tcpClient.Connected)
+                    if (m != null) m.WaitOne();
+                    if (tcpClient != null && tcpClient.Connected)
                     {
                         // 编码心跳消息
                         string heartbeatMessage = "heartbeat";
@@ -154,21 +135,30 @@ namespace Rcd
                         if (bytesRead > 0)
                         {
                             string receivedMessage = Encoding.ASCII.GetString(buffer, 0, bytesRead);
-
-                            // 触发接收到消息的事件
-                            SenMessageToWinForm(receivedMessage);
+                            // 触发 MessageSent 事件，供 returnMsg 处理扫码结果
+                            if (MessageSent != null)
+                                MessageSent(this, receivedMessage);
                         }
                     }
-                    //else
-                    //{
-                    //    // 如果没有数据可用，可以适当休眠，避免占用过多CPU资源
-                    //    Thread.Sleep(300);
-                    //}
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine("接收消息时发生异常: {0}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 接收返回信息
+        /// </summary>
+        /// <param name="msg"></param>
+        public void returnMsg(object sender, string msg)
+        {
+            //确保是可以扫码成功
+            if (msg.Trim().Length == 7)
+            {
+                DJId = msg.Trim();
+                Console.WriteLine(msg.Trim());
             }
         }
 
@@ -217,23 +207,25 @@ namespace Rcd
         /// </summary>
         public void StopHeart()
         {
-            ListenTokenSoure.Cancel();//取消监听线程
+            if (ListenTokenSoure != null)
+                ListenTokenSoure.Cancel();//取消监听线程
         }
+
         /// <summary>
         /// 暂停心跳包
         /// </summary>
         public void PauseHeart()
         {
-            m.Reset();
+            if (m != null) m.Reset();
         }
+
         /// <summary>
         /// 继续发送心跳包
         /// </summary>
         public void ContinueHeart()
         {
-            m.Set();
+            if (m != null) m.Set();
         }
-
 
         /// <summary>
         /// 断开连接
@@ -243,8 +235,15 @@ namespace Rcd
             try
             {
                 isConnect = false;
-                StopHeart();
-                tcpClient.Close();
+                if (ListenTokenSoure != null)
+                    ListenTokenSoure.Cancel();
+                // 唤醒可能卡在 m.WaitOne() 的心跳线程，避免线程泄漏
+                if (m != null)
+                {
+                    try { m.Set(); } catch { }
+                }
+                if (tcpClient != null)
+                    tcpClient.Close();
             }
             catch (Exception ex)
             {

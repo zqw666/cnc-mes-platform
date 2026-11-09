@@ -1,4 +1,4 @@
-﻿using Opc.Ua;
+﻿﻿using Opc.Ua;
 using Siemens.OpcUA;
 using System;
 using System.Collections.Generic;
@@ -187,7 +187,7 @@ namespace MacCommunicate
                 case "2": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "停止");
                 case "3": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "运行");
                 case "4": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "等待");
-                case "5": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "完成");
+                case "5": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "取消");
                 case "-1": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "连接失败");
                 default: return new Siemensoperate.MachineStatus(-2, "未知");
             }
@@ -207,7 +207,7 @@ namespace MacCommunicate
                 case "2": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "停止");
                 case "3": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "运行");
                 case "4": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "等待");
-                case "5": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "完成");
+                case "5": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "取消");
                 case "-1": return new Siemensoperate.MachineStatus(Convert.ToInt32(Stu), "连接失败");
                 default: return new Siemensoperate.MachineStatus(-2, "未知");
             }
@@ -426,6 +426,70 @@ namespace MacCommunicate
                 return dataValues[0].Value.ToString();
             }
         }
+        /// <summary>
+        /// 批量读取多个 OPC UA 节点（单次连接内完成，读取后断开）
+        /// 连接时自动解析 SinumerikVarProvider 命名空间索引，未先 Connect() 也可正常读取
+        /// </summary>
+        /// <param name="commands">节点路径列表</param>
+        /// <returns>节点路径 -> 值 的字典；读取失败返回空字典</returns>
+        public Dictionary<string, string> ReadMany(params string[] commands)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            if (commands == null || commands.Length == 0)
+                return result;
+            lock (this)
+            {
+                try
+                {
+                    Server = new Server();
+                    Server.CertificateEvent -= new certificateValidation(m_Server_CertificateEvent);
+                    Server.subscriptionInfo -= new Server.SubscriptionInfo(m_Server_subscriptionInfo);
+                    Server.CertificateEvent += new certificateValidation(m_Server_CertificateEvent);
+                    Server.subscriptionInfo += new Server.SubscriptionInfo(m_Server_subscriptionInfo);
+                    string url = GetOpcUrl();
+                    Server.Connect(url, Michine_UserName, Michine_PassWord);
+
+                    // 解析 SinumerikVarProvider 命名空间索引
+                    NodeIdCollection nsNodes = new NodeIdCollection();
+                    nsNodes.Add(Variables.Server_NamespaceArray);
+                    Opc.Ua.DataValueCollection nsResults;
+                    Server.ReadValues(nsNodes, out nsResults);
+                    if (nsResults.Count > 0 && nsResults[0].StatusCode.ToString() == "Good")
+                    {
+                        string[] nameSpaceArray = nsResults[0].Value as string[];
+                        if (nameSpaceArray != null)
+                        {
+                            for (ushort i = 0; i < nameSpaceArray.Length; i++)
+                            {
+                                if (nameSpaceArray[i] == "SinumerikVarProvider")
+                                {
+                                    m_NameSpaceIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    NodeIdCollection nodes = new NodeIdCollection();
+                    foreach (string cmd in commands)
+                        nodes.Add(new NodeId(cmd, m_NameSpaceIndex));
+                    Opc.Ua.DataValueCollection dataValues = new Opc.Ua.DataValueCollection();
+                    Server.ReadValues(nodes, out dataValues);
+                    for (int i = 0; i < commands.Length && i < dataValues.Count; i++)
+                    {
+                        string val = dataValues[i] != null && dataValues[i].Value != null
+                            ? dataValues[i].Value.ToString() : "";
+                        result[commands[i]] = val;
+                    }
+                    Server.Disconnect();
+                }
+                catch
+                {
+                    try { Server.Disconnect(); } catch { }
+                }
+            }
+            return result;
+        }
 
         /// <summary>
         /// 获取当前机床内执行程序的名称
@@ -460,6 +524,19 @@ namespace MacCommunicate
                     default: return "UKNOW";//未知模式
                 }
             }
+        }
+
+        /// <summary>
+        /// 连接文件传输服务（WinSCP/SCP），用于上传/下载/删除机床内程序
+        /// </summary>
+        /// <returns></returns>
+        public bool ConnectFileTransfer()
+        {
+            try
+            {
+                return _fileTransfer.Connect();
+            }
+            catch { return false; }
         }
 
         /// <summary>

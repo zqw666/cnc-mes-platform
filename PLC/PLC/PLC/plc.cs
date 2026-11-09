@@ -67,7 +67,7 @@ namespace PLC
                 {
                     if (omronplc.WriteDM(Convert.ToUInt16(DM), Convert.ToUInt16(task)))
                     {
-                        flag = cioval != 0;
+                        flag = true;
                     }
                 }
                 catch (Exception e)
@@ -352,7 +352,7 @@ namespace PLC
                 if (WriteDM(dm, task))//发送任务号
                 {
                     if (WriteWR(wr, 1))//给PLC发送任务开始信号
-                        flag = cioval != 0;
+                        flag = true;
                 }
             }
             return flag;
@@ -401,7 +401,8 @@ namespace PLC
         /// </summary>
         public void close()
         {
-            omronplc.Close();
+            try { omronplc.Close(); }
+            catch (Exception) { }
         }
     }
 }
